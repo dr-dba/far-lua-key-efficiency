@@ -32,7 +32,9 @@ local DM_GETDIALOGINFO	= F.DM_GETDIALOGINFO
 local DN_CLOSE		= F.DN_CLOSE
 local DE_DLGPROCINIT	= F.DE_DLGPROCINIT
 local DE_DLGPROCEND	= F.DE_DLGPROCEND
-F = nil 
+F = nil --[[ "F." looks ugly and cumbersome,
+to save nothing about performance overhead,
+so we are not to use it ]]
 require("Lib-Common-@Xer0X")
 require("introspection-@Xer0X")
 local fnc_find_macrolist	= Xer0X.fnc_find_macrolist
