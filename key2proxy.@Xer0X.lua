@@ -1,23 +1,25 @@
-﻿local Info = Info or package.loaded.regscript or function(...) return ... end
+local Info = Info or package.loaded.regscript or function(...) return ... end
 local nfo = Info {
 	_filename or ...,
-	name = "key2 process",
+	name = "Key (two) Proxy",
 	description = "Обработка последовательности двух клавиатурных комбинаций",
-	id = "169A2C91-3089-4047-9B95-6387A426D51D",
-	version = "0.1.0",
-	author = "Xer0X",
+	id = "8757843E-865B-43E8-9887-94F8FF6C942C",
+	version	= "0.9.2";
+	version_mod = "0.1.0",
+	author = "IgorZ",
+	author_mod = "Xer0X",
 	minfarversion = { 3, 0, 0, 4000, 0 },
+	url = "https://forum.farmanager.com/viewtopic.php?f=15&t=9712",
+	url_mod = "https://github.com/dr-dba/far-lua-key-efficiency",
 	options = {
 		excludekeys = "",
 		debug = true
 	}
 }
-
 if not nfo then return end
 local opts = nfo.options
-local GUID_ZERO			= "00000000-0000-0000-0000-000000000000"
+if not	Xer0X then Xer0X = { } end
 local GUID_MENU_MACRO_SELECT	= "165AA6E3-C89B-4F82-A0C5-C309243FD21B"
-local FLAG_MENU_SEP		= 0x00000004
 local rx = regex.new("(.*)(?<=LCtrl|.LAlt|RCtrl|.RAlt|.Ctrl|..Alt|Shift)(?!LCtrl|LAlt|RCtrl|RAlt|Ctrl|Alt|Shift)")
 local F = far.Flags
 local ACTL_GETWINDOWINFO= F.ACTL_GETWINDOWINFO
@@ -30,7 +32,7 @@ local DM_GETDIALOGINFO	= F.DM_GETDIALOGINFO
 local DN_CLOSE		= F.DN_CLOSE
 local DE_DLGPROCINIT	= F.DE_DLGPROCINIT
 local DE_DLGPROCEND	= F.DE_DLGPROCEND
-F = nil
+F = nil 
 require("Lib-Common-@Xer0X")
 require("introspection-@Xer0X")
 local fnc_find_macrolist	= Xer0X.fnc_find_macrolist
@@ -142,18 +144,18 @@ Macro { description = "Обработка вторичной клавиатур�
 	area = "Menu", key = "/.+/",
 	priority = 100,
 	
-	condition = function(inp_key, tbl_mcr, p2, p3)
+	condition = function(inp_key, tbl_mcr)
 		if	Menu.Id == GUID_MENU_MACRO_SELECT and not (" "..nfo.options.excludekeys.." "):cfind(" "..inp_key.." ", 1, true)
 		then	local run_inf = { }
 			run_inf.mcr_idx, run_inf.win_inf, run_inf.dlg_inf, run_inf.dlg_hnd = fnc_macro_choose_helper(inp_key)
-			if	run_inf.mcr_idx 
+			if	run_inf.mcr_idx
 			and	run_inf.mcr_idx > 0
 			then	tbl_mcr.run_inf = run_inf
 				return true
 			end
 		end
 	end,
-	action = function(tbl_mcr, var1, var2, var3)
+	action = function(tbl_mcr)
 		local	menu_pos = tbl_mcr.run_inf.dlg_hnd:send(DM_LISTSETCURPOS, 1, { SelectPos = tbl_mcr.run_inf.mcr_idx } )
 		if	menu_pos > 0
 		then	Keys("Enter")
@@ -171,12 +173,11 @@ Event { description = "test dialog event";
 		end
 		local	dlg_info = far.SendDlgMessage(fde.hDlg, DM_GETDIALOGINFO)
 		if not	dlg_info then return end
-		local dlg_guid = fnc_norm_guid(dlg_info.Id) or fnc_norm_guid(Menu.Id)
-		return dlg_guid == GUID_MENU_MACRO_SELECT
+		local	dlg_guid = fnc_norm_guid(dlg_info.Id) or fnc_norm_guid(Menu.Id)
+		return	dlg_guid == GUID_MENU_MACRO_SELECT
 	end;
 	action = function(evt, fde)
 		local dlg_info = far.SendDlgMessage(fde.hDlg, DM_GETDIALOGINFO)
-		local dlg_guid = fnc_norm_guid(dlg_info.Id) or fnc_norm_guid(Menu.Id)
 		fnc_macro_choose_helper(nil, dlg_info, fde.hDlg)
 	end;
 }
