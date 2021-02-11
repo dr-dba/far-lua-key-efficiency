@@ -56,7 +56,6 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	local dlg_handle = Xer0X.dlg_handles and Xer0X.dlg_handles[dlg_hnd_str]
 	local dlg_xuid = dlg_handle and dlg_handle.xuid
 	local dlg_data = dlg_xuid and Xer0X.dlg_data[dlg_xuid]
-	
 	mcrLst_found,
 	tbl_mcr_lst_upv,
 	tbl_mcr_lst_loc,
@@ -71,7 +70,6 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	if	dlg_data
 	then	dlg_data.menu_vals_map = menu_vals_map
 	end
-	
 	tbl_ext_keys = { }
 	tbl_menu_items = { }
 	sep_cnt = 0
@@ -145,7 +143,6 @@ end
 Macro { description = "Обработка вторичной клавиатурной комбинации в меню выбора макроса",
 	area = "Menu", key = "/.+/",
 	priority = 100,
-	
 	condition = function(inp_key, tbl_mcr)
 		if	Menu.Id == GUID_MENU_MACRO_SELECT and not (" "..nfo.options.excludekeys.." "):cfind(" "..inp_key.." ", 1, true)
 		then	local run_inf = { }
