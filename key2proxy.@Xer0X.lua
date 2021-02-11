@@ -1,3 +1,5 @@
+--[[
+if 1 then return end --]]
 local Info = Info or package.loaded.regscript or function(...) return ... end
 local nfo = Info {
 	_filename or ...,
@@ -56,6 +58,7 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	local dlg_handle = Xer0X.dlg_handles and Xer0X.dlg_handles[dlg_hnd_str]
 	local dlg_xuid = dlg_handle and dlg_handle.xuid
 	local dlg_data = dlg_xuid and Xer0X.dlg_data[dlg_xuid]
+	
 	mcrLst_found,
 	tbl_mcr_lst_upv,
 	tbl_mcr_lst_loc,
@@ -142,7 +145,7 @@ end
 
 Macro { description = "Обработка вторичной клавиатурной комбинации в меню выбора макроса",
 	area = "Menu", key = "/.+/",
-	priority = 100,
+	priority = 100,	
 	condition = function(inp_key, tbl_mcr)
 		if	Menu.Id == GUID_MENU_MACRO_SELECT and not (" "..nfo.options.excludekeys.." "):cfind(" "..inp_key.." ", 1, true)
 		then	local run_inf = { }
@@ -180,4 +183,5 @@ Event { description = "Key2proxy helper dialog event";
 		fnc_macro_choose_helper(nil, dlg_info, fde.hDlg)
 	end;
 }
+
 -- @@@@@
