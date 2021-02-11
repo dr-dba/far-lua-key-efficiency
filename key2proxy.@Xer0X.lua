@@ -165,7 +165,7 @@ Macro { description = "Обработка вторичной клавиатур�
 	end
 }
 
-Event { description = "test dialog event";
+Event { description = "Key2proxy helper dialog event";
 	group = "DialogEvent";
 	priority = 100;
 	condition = function(evt, fde)
@@ -183,3 +183,4 @@ Event { description = "test dialog event";
 		fnc_macro_choose_helper(nil, dlg_info, fde.hDlg)
 	end;
 }
+-- @@@@@
