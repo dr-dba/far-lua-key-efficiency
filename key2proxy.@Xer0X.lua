@@ -57,8 +57,7 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	local dlg_hnd_str = tostring(hDlg)
 	local dlg_handle = Xer0X.dlg_handles and Xer0X.dlg_handles[dlg_hnd_str]
 	local dlg_xuid = dlg_handle and dlg_handle.xuid
-	local dlg_data = dlg_xuid and Xer0X.dlg_data[dlg_xuid]
-	
+	local dlg_data = dlg_xuid and Xer0X.dlg_data[dlg_xuid]	
 	mcrLst_found,
 	tbl_mcr_lst_upv,
 	tbl_mcr_lst_loc,
