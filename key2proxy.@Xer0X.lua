@@ -4,14 +4,14 @@ if 1 then return end --]]
 https://github.com/dr-dba/far-lua-internals
 https://github.com/dr-dba/far-lua-general-utils
 ]]
-local Info = Info or package.loaded.regscript or function(...) return ... end
+local Info = Info or package.loaded.regscript or function(...) return ... end 
 local nfo = Info {
 	_filename or ...,
 	name = "Key (two) Proxy",
 	description = "Обработка последовательности двух клавиатурных комбинаций",
 	id = "8757843E-865B-43E8-9887-94F8FF6C942C",
 	version	= "0.9.2";
-	version_mod = "0.1.0",
+	version_mod = "0.1.0", 
 	author = "IgorZ",
 	author_mod = "Xer0X",
 	minfarversion = { 3, 0, 0, 4000, 0 },
@@ -43,7 +43,7 @@ to save nothing about performance overhead,
 so we are not to use it ]]
 require("Lib-Common-@Xer0X")
 require("introspection-@Xer0X")
-local fnc_find_macrolist	= Xer0X.fnc_find_macrolist
+local fnc_macrolist_find	= Xer0X.fnc_macrolist_find
 local fnc_str_trim1		= Xer0X.fnc_str_trim1
 local fnc_norm_menu_value	= Xer0X.fnc_norm_menu_value
 local fnc_norm_guid		= Xer0X.fnc_norm_guid
@@ -62,12 +62,11 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	local dlg_handle = Xer0X.dlg_handles and Xer0X.dlg_handles[dlg_hnd_str]
 	local dlg_xuid = dlg_handle and dlg_handle.xuid
 	local dlg_data = dlg_xuid and Xer0X.dlg_data[dlg_xuid]
-	
 	mcrLst_found,
 	tbl_mcr_lst_upv,
 	tbl_mcr_lst_loc,
 	tbl_mcr_items_L
-		= fnc_find_macrolist()
+		= fnc_macrolist_find()
 	if not	tbl_mcr_lst_loc then return end
 	if	tbl_mcr_items_L.MLT_MCR_SEL_HLP
 	then	goto done_with_it
@@ -77,7 +76,6 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	if	dlg_data
 	then	dlg_data.menu_vals_map = menu_vals_map
 	end
-	
 	tbl_ext_keys = { }
 	tbl_menu_items = { }
 	sep_cnt = 0
@@ -146,12 +144,11 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	end
 	::done_with_it::
 	return inp_key and tbl_ext_keys[inp_key_low], win_info, dlg_info, hDlg
-end
+end -- end of fnc_macro_choose_helper(..)
 
 Macro { description = "Обработка вторичной клавиатурной комбинации в меню выбора макроса",
 	area = "Menu", key = "/.+/",
 	priority = 100,
-	
 	condition = function(inp_key, tbl_mcr)
 		if	Menu.Id == GUID_MENU_MACRO_SELECT and not (" "..nfo.options.excludekeys.." "):cfind(" "..inp_key.." ", 1, true)
 		then	local run_inf = { }
@@ -175,7 +172,7 @@ Event { description = "Key2proxy helper dialog event";
 	group = "DialogEvent";
 	priority = 100;
 	condition = function(evt, fde)
-		if	evt	== DE_DLGPROCINIT
+		if	evt	== DE_DLGPROCINIT 
 		and	fde.Msg == DN_CLOSE
 		then	return false
 		end
