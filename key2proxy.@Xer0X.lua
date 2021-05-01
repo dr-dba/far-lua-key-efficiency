@@ -155,8 +155,9 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	return inp_key and tbl_ext_keys[inp_key_low], win_info, dlg_info, hDlg
 end -- fnc_macro_choose_helper(...)
 
-Macro { description = "Обработка вторичной клавиатурной комбинации в меню выбора макроса",
-	area = "Menu", key = "/.+/",
+Macro { description = "Key2proxy Обработка вторичной клавиатурной комбинации в меню выбора макроса (@Xer0X mod of key2process)",
+	area = "Menu", 
+	key = "/.+/",
 	priority = 100,
 	--[[ если это меню выбора и клавиатурная комбинация не запрещена,
 	то будем работать]]
@@ -180,7 +181,7 @@ Macro { description = "Обработка вторичной клавиатур�
 	end
 }
 
-Event { description = "Key2proxy helper dialog event";
+Event { description = "Key2proxy helper dialog event (@Xer0X mod of key2process)";
 	group = "DialogEvent";
 	priority = 100;
 	condition = function(evt, fde)
