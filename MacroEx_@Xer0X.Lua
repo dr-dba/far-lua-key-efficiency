@@ -15,6 +15,7 @@ local nfo = Info {
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
+	url_mod		= "https://github.com/dr-dba/far-lua-key-efficiency/",
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion = { 3, 0, 0, 4430, 0 },
 	options = {
