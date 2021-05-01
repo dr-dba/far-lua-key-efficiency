@@ -1,5 +1,12 @@
 --[[
 if 1 then return end --]]
+--[[
+Запуск макросов кнопкосочетаниями, нажатыми в меню выбора макроса.
+https://forum.farmanager.com/viewtopic.php?t=9712
+
+Менеджер закладок для папок
+http://forum.farmanager.com/viewtopic.php?t=8465
+--]]
 --[[ DEPENDENCIES:
 https://github.com/dr-dba/far-lua-internals
 https://github.com/dr-dba/far-lua-general-utils
@@ -7,26 +14,28 @@ https://github.com/dr-dba/far-lua-general-utils
 local Info = Info or package.loaded.regscript or function(...) return ... end 
 local nfo = Info {
 	_filename or ...,
-	name = "Key (two) Proxy",
-	description = "Обработка последовательности двух клавиатурных комбинаций",
-	id = "8757843E-865B-43E8-9887-94F8FF6C942C",
-	version	= "0.9.2";
-	version_mod = "0.1.0", 
-	author = "IgorZ",
-	author_mod = "Xer0X",
-	minfarversion = { 3, 0, 0, 4000, 0 },
-	url = "https://forum.farmanager.com/viewtopic.php?f=15&t=9712",
-	url_mod = "https://github.com/dr-dba/far-lua-key-efficiency",
-	options = {
-		excludekeys = "",
-		debug = true
+	name		= "Key (two) Proxy",
+	description	= "Обработка последовательности двух клавиатурных комбинаций",
+	id		= "8757843E-865B-43E8-9887-94F8FF6C942C",
+	version		= "0.9.2";
+	version_mod	= "0.1.1", -- http://semver.org/lang/ru/
+	author		= "IgorZ",
+	author_mod 	= "Xer0X",
+	minfarversion	= { 3, 0, 0, 4000, 0 },
+	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=9712",
+	url_mod		= "https://github.com/dr-dba/far-lua-key-efficiency",
+--	files		= "*Eng.hlf;*Rus.hlf;*Eng.lng;*Rus.lng";
+--	history		= "",
+	options		= {
+	--	bdsize		= 0,
+		excludekeys	= "",
+		debug		= true
 	}
 }
 if not nfo then return end
 local opts = nfo.options
-if not	Xer0X then Xer0X = { } end
+-- меню выбора макросов:
 local GUID_MENU_MACRO_SELECT	= "165AA6E3-C89B-4F82-A0C5-C309243FD21B"
-local rx = regex.new("(.*)(?<=LCtrl|.LAlt|RCtrl|.RAlt|.Ctrl|..Alt|Shift)(?!LCtrl|LAlt|RCtrl|RAlt|Ctrl|Alt|Shift)")
 local F = far.Flags
 local ACTL_GETWINDOWINFO= F.ACTL_GETWINDOWINFO
 local DM_LISTGETTITLES	= F.DM_LISTGETTITLES
@@ -144,11 +153,13 @@ local function fnc_macro_choose_helper(inp_key, win_info, dlg_info, hDlg)
 	end
 	::done_with_it::
 	return inp_key and tbl_ext_keys[inp_key_low], win_info, dlg_info, hDlg
-end -- end of fnc_macro_choose_helper(..)
+end -- fnc_macro_choose_helper(...)
 
 Macro { description = "Обработка вторичной клавиатурной комбинации в меню выбора макроса",
 	area = "Menu", key = "/.+/",
 	priority = 100,
+	--[[ если это меню выбора и клавиатурная комбинация не запрещена,
+	то будем работать]]
 	condition = function(inp_key, tbl_mcr)
 		if	Menu.Id == GUID_MENU_MACRO_SELECT and not (" "..nfo.options.excludekeys.." "):cfind(" "..inp_key.." ", 1, true)
 		then	local run_inf = { }
@@ -161,6 +172,7 @@ Macro { description = "Обработка вторичной клавиатур�
 		end
 	end,
 	action = function(tbl_mcr)
+		-- https://api.farmanager.com/ru/structures/farlistpos.html
 		local	menu_pos = tbl_mcr.run_inf.dlg_hnd:send(DM_LISTSETCURPOS, 1, { SelectPos = tbl_mcr.run_inf.mcr_idx } )
 		if	menu_pos > 0
 		then	Keys("Enter")
