@@ -3,99 +3,120 @@ if true then return end --]]
 
 -- luacheck: ignore 113/Info
 local Info = Info or package.loaded.regscript or function(...) return ... end
-
-local nfo = Info {
+local nfo = Info({
 	_filename or ...,
 	name		= "MacroEx",
 	-- запуск макросов нетрадиционными способами
-	description	= "Launching macros in unconventional ways",
-	id		= "115C9534-8273-4F5A-94EB-E321D6DC8618",
+	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
+	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "0.5",
+	version_mod	= "0.6",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
 	url_mod		= "https://github.com/dr-dba/far-lua-key-efficiency/",
 	-- LuaMacro 501 (ConsoleInput)
-	minfarversion = { 3, 0, 0, 4430, 0 },
+	minfarversion	= { 3, 0, 0, 4430, 0 },
 	options = {
-		break_sequence_on_mod_release	= false,
-		allow_sequence_with_any_mod	= true,
-		Delay	=  500,
-		SeqDelay= 5000,
-		debug	= false
+		break_seq_on_mod_release= false,
+		allow_seq_with_any_mod	= true,
+		Delay		=  500,
+		SeqDelay	= 5000,
+		ext_modes 	= {
+			hold	= true,
+			double	= true,
+		},
+		Debug		= false,
 	}
-}
-
+})
 if not nfo then return end
+local opts	= nfo.options
+local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
+local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
+local OPT_DEBUG			= opts.Debug
+local OPT_DELAY_SEQ		= opts.SeqDelay
+local OPT_DELAY			= opts.Delay
+local fnc_case_title 	= Xer0X.fnc_case_title
+local fnc_case_toggle	= Xer0X.fnc_case_toggle
+local F	= far.Flags
+local C = far.Colors
 
-local opts = nfo.options
-local F = far.Flags
-
-function fnc_case_title(str)
-	local function fnc_title_int(first, rest) return first:upper()..rest:lower() end
-	return string.gsub(str, "(%a)([%w']*)", fnc_title_int)
+local Xer0X
+	= require("Lib-Common-@Xer0X")
+local req_ok, req_msg, fnc_lua_exp, tbl_lua_exp_hidden_props
+	= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
+if not req_ok
+then req_ok, req_msg, fnc_lua_exp
+	= Xer0X.fnc_safe_require("LE")
+end
+local as_module, inp_args, own_file_path
+	= Xer0X.fnc_file_whoami()
+local	Macro = Macro
+local	Event = Event
+local	tbl_mcr_env, tbl_mcr_exinf
+if not	Macro
+then	tbl_mcr_env, tbl_mcr_exinf
+		= Xer0X.fnc_macro_one_load(nil, own_file_path, false, true)
+	Macro = tbl_mcr_env.Macro
+	Event = tbl_mcr_env.Event
 end
 
-function fnc_case_toggle(str)
-	local function fnc_toggle_int(first, rest) return first:lower()..rest:upper() end
-	return string.gsub(str, "(%a)([%w']*)", fnc_toggle_int)
-end
 
-local function errmsg(msg, ...)
-	local msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
-	local buttons = select('#', ...) > 0 and "Ok;&Lua explorer" or "Ok"
-	local a_msg_res
-	repeat
-		a_msg_res = far.Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
+local function fnc_err_msg(msg, ...)
+	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
+	local	buttons = select('#', ...) > 0 and "Ok;&Lua explorer" or "Ok"
+	local	a_msg_res
+	repeat	a_msg_res = far.Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
 		if a_msg_res == 2
 		then	-- to view args
 			require("LuaExplorer-@Xer0X")({ ... }, msg)
 		end
-	until a_msg_res ~= 2
-end
+	until	a_msg_res ~= 2
+end -- fnc_err_msg
 
 local killAutorepeat, isHolding
 
 do
-	local norepeat
+	local no_repeat
+
+	function killAutorepeat(vk) no_repeat = vk end
+
+	function isHolding(vk) return no_repeat == vk end
 
 	Event {	description = "MacroEx helper",
 		group = "ConsoleInput",
 		action = function(Rec)
-			if	norepeat
+			if	no_repeat
 			and	Rec.EventType == F.KEY_EVENT
 			and	Rec.VirtualKeyCode ~= 0
 			then	-- KEY_NONE? Rec.VirtualKeyCode == 0
-				if	Rec.VirtualKeyCode == norepeat
+				if	Rec.VirtualKeyCode == no_repeat
 				and	Rec.KeyDown
 				then	-- eat repetitions
 					return 1
-				else	norepeat = false
+				else	no_repeat = false
 				end
 			end
 		end
 	}
-
-	function killAutorepeat(vk) norepeat = vk end
-
-	function isHolding(vk) return norepeat == vk end
-
 end
 
 -- State after last mf.waitkey!!
-local function isReleased(Mod) return band(Mouse.LastCtrlState, Mod) == 0 end
+local function isReleased(mod_state) return
+	band(Mouse.LastCtrlState, mod_state) == 0,
+	band(Mouse.LastCtrlState, mod_state),
+	Mouse.LastCtrlState
+end
 
-local C = far.Colors
 -- C.COL_MENUTITLE
 local Color = far.AdvControl(F.ACTL_GETCOLOR, C.COL_MENUHIGHLIGHT)
 
 local function setStatus(text, color)
 	if	text == "anassigned"
-	then	text = text.."??"
+	then	text = text.." ??"
 	end
-	if	text and
-		type(text) == "string"
+	if	text
+	and	type(text) == "string"
 	then
 		far.Text(1, 0, color, " "..text.." ")
 		far.Text()
@@ -103,35 +124,39 @@ local function setStatus(text, color)
 end
 
 -- ?? premake help or store macros
-local function getSeqHelp(key)
+local function getSeqHelp(seq_key)
 	local tbl_help	= { }
 	local area_re	= "%f[%a]"..string.lower(Area.Current).."%f[%A]"
-	local key_re	= "%f[%a]"..string.lower(key).."%-"
+	local key_re	= "%f[%a]"..string.lower(seq_key).."%-"
 	for ii = 1, math.huge
 	do
-		local	mcr = mf.GetMacroCopy(ii)
-		if not	mcr then break end
+		local	ii_mcr = mf.GetMacroCopy(ii)
+		if not	ii_mcr then break end
 		-- ?? use GetMacro
-		if	mcr.key and
-		not	mcr.keyregex
+		if	ii_mcr.key
+		and not ii_mcr.keyregex
 		then
-			if string.match(string.lower(mcr.key), key_re)
+			local ii_mcr_area_low = string.lower(ii_mcr.area)
+			if string.match(string.lower(ii_mcr.key), key_re)
 			then
 				-- ?? checkFlags, CheckFileName
-				if	(mcr.area == "common" or string.find(string.lower(mcr.area), area_re)) and
-					not mcr.disabled and (
-						mcr.condition == nil or
-						type(mcr.condition) == "function" and mcr.condition(key) or
-						mcr.condition
-							)
+				if (	ii_mcr_area_low == "common"
+				or	string.find(ii_mcr_area_low, area_re)
+				)
+				and not ii_mcr.disabled
+				and (		ii_mcr.condition == nil
+					or	type(ii_mcr.condition) == "function"
+					and	ii_mcr.condition(seq_key)
+					or	ii_mcr.condition
+				)
 				then -- ?? pcall
-					table.insert(tbl_help, mcr.description or mcr.key)
+					table.insert(tbl_help, ii_mcr.description or ii_mcr.key)
 				end
 			end
 		end
 	end
 	return next(tbl_help) and table.concat(tbl_help, "\n")
-end
+end -- getSeqHelp
 
 local function runMacro(key, Ex)
 	local	eval_res = eval(key..Ex, 2)
@@ -148,12 +173,12 @@ end
 local combo = regex.new("^((?:[rl]?ctrl)?(?:[rl]?alt)?(?:shift)?)((?:shift)|(?:alt))$", "i")
 
 local function tryComboMod(key)
-	local	mod, key = combo:match(key)
---	far.Show(mod, key)
-	if	mod
+	local	cmb_mod, cmb_key = combo:match(key)
+--	far.Show(cmb_mod, cmb_key)
+	if	cmb_mod
 	then
-		local	m = far.NameToInputRecord(mod.."a")
-		local	k = far.NameToInputRecord(key)
+		local	m = far.NameToInputRecord(cmb_mod.."a")
+		local	k = far.NameToInputRecord(cmb_key)
 		if	m and k
 		then	return {
 				ControlKeyState	= m.ControlKeyState,
@@ -163,7 +188,7 @@ local function tryComboMod(key)
 	end
 end
 
-local modmask = bor(
+local MOD_MASK = bor(
 	F.LEFT_ALT_PRESSED,
 	F.RIGHT_ALT_PRESSED,
 	F.LEFT_CTRL_PRESSED,
@@ -173,25 +198,32 @@ local modmask = bor(
 
 local Macro, FileName = Macro, ...
 
-local function setHandler(mkey, AKey, modslen, mcr)
-	local	r = far.NameToInputRecord(AKey) or tryComboMod(AKey)
-	if not	r
-	then    if opts.debug then errmsg(("Unexpected AKey: %q"):format(AKey), mcr) end
+local function setHandler(mkey, AKey, modsLen, mcr)
+	local	inp_rec = far.NameToInputRecord(AKey) or tryComboMod(AKey)
+	if not	inp_rec
+	then    if OPT_DEBUG
+		then fnc_err_msg(("Unexpected AKey: %q"):format(AKey), mcr)
+		end
 		return
 	end
-	local	mod = band(r.ControlKeyState, modmask)
-	if	mod == 0
-	then    if opts.debug then errmsg(("Unexpected ControlKeyState in %q: %q"):format(AKey, r.ControlKeyState), r) end
+	local	mod_state = band(inp_rec.ControlKeyState, MOD_MASK)
+	if	mod_state == 0
+	then    if OPT_DEBUG
+		then fnc_err_msg(("Unexpected ControlKeyState in %q: %q"):format(AKey, inp_rec.ControlKeyState), inp_rec)
+		end
 		return
 	end
 	-- http://bugs.farmanager.com/view.php?id=2947
-	if string.match(string.lower(AKey), "r?ctrlnumlock") then r = far.NameToInputRecord("Pause") end
-	local base_vk = r.VirtualKeyCode
+	if string.match(string.lower(AKey), "r?ctrlnumlock")
+	then	inp_rec = far.NameToInputRecord("Pause")
+	end
+	local base_vk = inp_rec.VirtualKeyCode
 	local handler_key = {
 		double	= { },
 		hold	= { },
 		sequence= { },
 		priority= { },
+	--	mod	= { },
 	}
 	-- to disable handler in order to run original macro
 	local locked
@@ -200,7 +232,10 @@ local function setHandler(mkey, AKey, modslen, mcr)
 			:gsub("shift",	"Shift")
 			:gsub("rctrl",	"RCtrl")
 			:gsub("lctrl",	"LCtrl")
-			:gsub("ctrl",	"Ctrl"),
+			:gsub("ctrl",	"Ctrl")
+			:gsub("ralt",	"RAlt")
+			:gsub("lalt",	"LAlt")
+			:gsub("alt",	"Alt"),
 		id = win.Uuid(win.Uuid()),
 	--	uid = mkey,
 		area = "Common",
@@ -208,36 +243,40 @@ local function setHandler(mkey, AKey, modslen, mcr)
 		FileName = FileName,
 		priority = 100,
 		condition = function(mcr_key, mcr_src, p2, p3)
-			return not locked and (
-				handler_key.priority[Area.Current:lower()] or 
-				handler_key.priority.common
+			return	not	locked
+				and (   handler_key.priority[Area.Current:lower()]
+				or 	handler_key.priority.common
 					)
 		end,
 		action = function(mcr_src, p1, p2, p3)
-			local is_hld_vk, is_rls_mod, timeout, run_normal
+			local is_hld_vk, is_rls_mod, is_timeout, run_normal
 			is_hld_vk = isHolding(base_vk)
 			-- prevent autorepeat:
 			if is_hld_vk then return end
 			killAutorepeat(base_vk)
 			local area = Area.Current:lower()
 			-- ?? inheritance (Autocompletion, Search)
-			local has_dbl = handler_key.double	[area] or handler_key.double.common
-			local has_hld = handler_key.hold	[area] or handler_key.hold.common
-			local has_seq = handler_key.sequence	[area] or handler_key.sequence.common
-		--	local is_mod = k.mod[area] or k.mod.common -- todo extramod
-			local key = ""
+			local has_dbl = handler_key.double	[area] or handler_key.double	.common
+			local has_hld = handler_key.hold	[area] or handler_key.hold	.common
+			local has_seq = handler_key.sequence	[area] or handler_key.sequence	.common
+		--	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
+			local next_key= "" 
 			local t_start = Far.UpTime
-			while not (timeout or key ~= "" or is_rls_mod)
+			local mod_state_new
+			local t_hold_time
+			while not (is_timeout or next_key ~= "" or is_rls_mod)
 			do
-				is_rls_mod = isReleased(mod)
-				if is_rls_mod then break end
-				key = mf.waitkey(10)
-				timeout = Far.UpTime - t_start > opts.Delay
-				if timeout then break end
+				is_rls_mod, mod_state_and, mod_state_new = isReleased(mod_state)
+				if is_rls_mod	then break end
+				next_key = mf.waitkey(10)
+				t_hold_time = Far.UpTime
+				is_timeout = t_hold_time - t_start > OPT_DELAY
+				if next_key~="" then break end
+				if is_timeout	then break end
 			end
-			if	timeout 
+			if	is_timeout 
 			then
-				if	has_hld 
+				if	has_hld
 				and	isHolding(base_vk)
 				then
 					if runMacro(AKey, ":Hold")
@@ -245,53 +284,57 @@ local function setHandler(mkey, AKey, modslen, mcr)
 					end
 				end
 			elseif
-				has_dbl and
-				key ~= "" and
-				string.lower(key) == string.lower(AKey)
+				has_dbl
+			and	next_key ~= ""
+			and	string.lower(next_key) == string.lower(AKey)
 			then
 				killAutorepeat(base_vk)
 				if runMacro(AKey, ":Double")
 				then return
 				end
 			end
-			local help_msg, help_ret, endkey, try_seq_wait, key2, key2_fix
-			if	has_seq 
-			then    -- CtrlAltShiftKey ==> CtrlAltShiftKey -- todo (match)
+			local help_msg, help_ret
+			if has_seq
+			then    -- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
 				AKey = mf.akey(1, 1)
 				local hnd_scr = far.SaveScreen()
 				setStatus(AKey, Color)
-				endkey = ("^%s(.+)"):format(AKey:sub(1, modslen))
-				while	true 
+				local end_key =
+					--[[ to require ending key with modifiers:
+					("^%s(.+)") --]]
+					("^%s(.*)") 
+					:format(AKey:sub(1, modsLen))
+				while	true
 				do
-					is_rls_mod = isReleased(mod)
-					if	is_rls_mod 
-					and	opts.break_sequence_on_mod_release
+					is_rls_mod = isReleased(mod_state)
+					if	is_rls_mod
+					and	BREAK_SEQ_ON_MOD_RELEASE
 					then	run_normal = true
 						break
 					end
-					if	key ~= "" 
+					if	next_key ~= ""
 					then
 						far.RestoreScreen(hnd_scr)
-						key2 = string.match(key, endkey)
-						key2_fix = key2 ~= "" and key2 or key
-						-- false == break_sequence_on_mod_release
+						local key2 = string.match(next_key, end_key)
+						local key2_fix = key2 ~= "" and key2 or next_key
+						-- false == BREAK_SEQ_ON_MOD_RELEASE
 						if	runMacro(AKey, "-"..key2_fix)
 						then	return
-						elseif	runMacro(AKey, "-"..key)
+						elseif	key2_fix ~= next_key
+						and	runMacro(AKey, "-"..next_key)
 						then	return
 						else	
-							timeout = true
+							is_timeout = true
 							run_normal = true
 						end
-						hnd_scr = nil;
+						hnd_scr = nil
 						break
 					end
-					try_seq_wait = true
-					key = mf.waitkey(10)
-					if not	help_msg 
-					and	Far.UpTime - t_start > opts.SeqDelay 
+					next_key = mf.waitkey(10)
+					if not	help_msg
+					and	Far.UpTime - t_start > OPT_DELAY_SEQ
 					then
-						timeout = true
+						is_timeout = true
 						help_msg = getSeqHelp(AKey)
 						if	help_msg
 						then	help_ret = far.Message(help_msg, AKey, "", "l")
@@ -301,12 +344,15 @@ local function setHandler(mkey, AKey, modslen, mcr)
 					end
 				end
 				if hnd_scr then far.RestoreScreen(hnd_scr) end
-			end
-			if not timeout or run_normal
+			end -- if has_seq
+			if not	is_timeout
+			or	run_normal
 			then
 				locked = true
 				runMacroOrKey(AKey)
-				if key ~= "" then runMacroOrKey(key) end
+				if next_key ~= ""
+				then runMacroOrKey(next_key)
+				end
 				locked = false
 				return
 			end
@@ -314,50 +360,52 @@ local function setHandler(mkey, AKey, modslen, mcr)
 			setStatus("anassigned", Color)
 			mf.beep()
 			win.Sleep(100)
-		end
+		end -- action
 	}
 	return handler_key
-end
+end -- setHandler
 
+local tbl_handlers = { }
+_G.Xer0X.tbl_macro_ex_handlers = tbl_handlers
+--[[ have to be base key, as in "CtrlRAltA" is "A":
 local parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
-
+--[=[! have NOT to be base key, as in "CtrlRAltA" is NiL:]]
+local parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
 --[[ todo:
-local parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
-return parse:match(("CtrlAlt"):lower())
+local parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
+return parse:match(("LCtrlRAlt"):lower())
 --]]
 
-local function fnc_build_key(RLctl, RLalt, shift, key)
-	return (
-		(RLctl and string.upper(RLctl).."Ctrl" or "")..
-		(RLalt and string.upper(RLalt).."Alt"  or "")..
-		(shift or "")..
-		(key and fnc_case_title(key) or "")
-			)
-		:gsub("shift", "Shift")
-end
+local function fnc_build_key(RLctl, RLalt, shift, key) return
+		(
+	(RLctl and string.upper(RLctl).."Ctrl" or "")..
+	(RLalt and string.upper(RLalt).."Alt"  or "")..
+	(shift or "")..
+	(key and fnc_case_title(key) or "")
+		)
+	:gsub("shift", "Shift")
+end -- fnc_build_key
 
-local function fnc_expand_key(key, ext_mod, mcr, callback)
+local function fnc_expand_key(key, ext_mod, mcr, fnc_callback)
 --	assert(key:match("^%l+$"))
 	local RLctl, RLalt, shift, base_key = parse:match(string.lower(key))
-	if not	base_key
-	or	base_key == ""
-	then
-		if opts.debug then errmsg(("Unable to parse key %q"):format(key), Rlctl, RLalt, shift, base_key) end
-		return
+	if	base_key == false
+	then	base_key = ""
 	end
+	local tbl_hnd_keys = { }
+	local key_fmt = "c:%s/a:%s/s:%s/b:%s/e:%s"
 	local ctl = RLctl == "" and "L"
 	repeat
 		local alt = RLalt == "" and "L"
 		repeat
-			callback(ctl or RLctl, alt or RLalt, shift, base_key, ext_mod, mcr)
+			local key_str = string.format(key_fmt, ctl or RLctl, alt or RLalt, shift, base_key, ext_mod)
+			tbl_hnd_keys[key_str] = fnc_callback(ctl or RLctl, alt or RLalt, shift, base_key, ext_mod, mcr)
 			alt = (alt or ""):lower() == "l" and "R"
 		until not alt
 		ctl = (ctl or ""):lower() == "l" and "R"
 	until not ctl
-end
-
-local tbl_handlers = { }
-_G.tbl_macro_ex_handlers = tbl_handlers
+	return tbl_hnd_keys
+end -- fnc_expand_key
 
 function fnc_expand_key_callback(	ctl, alt, shift, base_key, ext_mod, mcr)
 	local	mkey = fnc_build_key(	ctl, alt, shift, base_key)
@@ -368,8 +416,7 @@ function fnc_expand_key_callback(	ctl, alt, shift, base_key, ext_mod, mcr)
 			(ctl or ""):lower() == "l" and "" or ctl,
 			(alt or ""):lower() == "l" and "" or alt,
 			shift,
-			base_key
-				)
+			base_key)
 		hnd_key = setHandler(mkey, fkey, fkey:len() - base_key:len(), mcr)
 		tbl_handlers[mkey] = hnd_key
 	end
@@ -377,50 +424,67 @@ function fnc_expand_key_callback(	ctl, alt, shift, base_key, ext_mod, mcr)
 	if	hnd_key
 	then
 		local UniqAreas = { }
-		for mcr_area in mcr.area:lower():gmatch("%S+")
+		for ii_area in mcr.area:lower():gmatch("%S+")
 		do
-			if not	UniqAreas[mcr_area]
+			if not	UniqAreas[ii_area]
 			then 	-- prevent multiple inclusions
-				UniqAreas[mcr_area] = true
-				hnd_key[ext_mod][mcr_area] = true
-				hnd_key.priority[mcr_area] = math.max(hnd_key.priority[mcr_area] or 0, (mcr.priority or 50) + 5)
+				UniqAreas[ii_area] = true
+				hnd_key[ext_mod][ii_area] = true
+				hnd_key.priority[ii_area] = math.max(hnd_key.priority[ii_area] or 0, (mcr.priority or 50) + 5)
 				mcr[ext_mod] = true
-				if opts.debug
+				if OPT_DEBUG
 				then	mcr.base_key = base_key
 					table.insert(hnd_key, mcr)
 				end
 			end
 		end
 	end
-end
+	return hnd_key
+end -- fnc_expand_key_callback
 
-mf.postmacro(function()
-	local tbl_valid_ext_mod = { hold = 1, double = 1 }
+local function fnc_macro_ex_build_one(mcr)
+	local tbl_UniqKeys = { }
+	local tbl_hnd_keys = { }
+	for ii_key in mcr.key:lower():gmatch("%S+")
+	do	-- prevent multiple inclusions
+		if not	tbl_UniqKeys[ii_key]
+		then	tbl_UniqKeys[ii_key] = true
+			local	ii_key_base, ii_ext_mode = ii_key:match("^(.+):(.+)$")
+			if	ii_ext_mode
+			and not opts.ext_modes[ii_ext_mode]
+			then	ii_key_base = false
+			end
+			if not	ii_key_base
+			then	ii_key_base = ii_key:match("^(.+)%-.")
+				ii_ext_mode = "sequence"
+			end
+			--[[ todo extramod
+			if not	ii_key_base
+			then	ii_key_base = ii_key:match("^(.+)%+.")
+				ii_ext_mode = "mod"
+			end --]]
+			if	ii_key_base
+			then	tbl_hnd_keys[ii_key] = fnc_expand_key(ii_key_base, ii_ext_mode, mcr, fnc_expand_key_callback)
+			end
+		end
+	end
+	return tbl_hnd_keys
+end -- fnc_macro_ex_build_one
+
+local function fnc_macro_ex_build_all()
 	for ii = 1, math.huge
 	do
 		local	ii_mcr = mf.GetMacroCopy(ii)
 		if not	ii_mcr then break end
-		if	ii_mcr.key and
-		not 	ii_mcr.keyregex
-		then
-			local UniqKeys = { }
-			for Key in ii_mcr.key:lower():gmatch("%S+")
-			do	-- prevent multiple inclusions
-				if not	UniqKeys[Key]
-				then
-					UniqKeys[Key] = true
-					local	key, ext_mod = Key:match("^(.+):(.+)$")
-					if	ext_mod and not tbl_valid_ext_mod[ext_mod] then key = false	end
-					if not	key then key, ext_mod = Key:match("^(.+)%-."), "sequence"	end
-					-- todo extramod
-					if	key
-					then	fnc_expand_key(key, ext_mod, ii_mcr, fnc_expand_key_callback)
-					end
-				end
-			end
+		if	ii_mcr.key
+		and not ii_mcr.keyregex
+		then	fnc_macro_ex_build_one(ii_mcr)
 		end
 	end
-	if opts.debug then le(tbl_handlers) end
-end)
+	if OPT_DEBUG then fnc_lua_exp(tbl_handlers) end
+	return tbl_handlers
+end -- fnc_macro_ex_find_all
+
+mf.postmacro(fnc_macro_ex_build_all)
 
 -- @@@@@
