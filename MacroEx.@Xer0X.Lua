@@ -40,6 +40,12 @@ local fnc_case_title 	= Xer0X.fnc_case_title
 local fnc_case_toggle	= Xer0X.fnc_case_toggle
 local F	= far.Flags
 local C = far.Colors
+local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
+local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
+local LEFT_CTRL_PRESSED	= F.LEFT_CTRL_PRESSED
+local RIGHT_CTRL_PRESSED= F.RIGHT_CTRL_PRESSED
+local SHIFT_PRESSED	= F.SHIFT_PRESSED
+
 
 local Xer0X
 	= require("Lib-Common-@Xer0X")
@@ -102,10 +108,13 @@ do
 end
 
 -- State after last mf.waitkey!!
-local function isReleased(mod_state) return
-	band(Mouse.LastCtrlState, mod_state) == 0,
-	band(Mouse.LastCtrlState, mod_state),
-	Mouse.LastCtrlState
+local function isReleased(mod_state)
+	local mod_last = Mouse.LastCtrlState
+	return
+	band(mod_last, mod_state) == 0,
+	band(mod_last, mod_state),
+	mod_last,
+	Mouse.CtrlState
 end
 
 -- C.COL_MENUTITLE
@@ -144,12 +153,12 @@ local function getSeqHelp(seq_key)
 				or	string.find(ii_mcr_area_low, area_re)
 				)
 				and not ii_mcr.disabled
-				and (		ii_mcr.condition == nil
-					or	type(ii_mcr.condition) == "function"
-					and	ii_mcr.condition(seq_key)
-					or	ii_mcr.condition
+				and (	ii_mcr.condition == nil
+				or	type(ii_mcr.condition) == "function"
+				and	ii_mcr.condition(seq_key)
+				or	ii_mcr.condition
 				)
-				then -- ?? pcall
+				then	-- ?? pcall
 					table.insert(tbl_help, ii_mcr.description or ii_mcr.key)
 				end
 			end
@@ -189,35 +198,36 @@ local function tryComboMod(key)
 end
 
 local MOD_MASK = bor(
-	F.LEFT_ALT_PRESSED,
-	F.RIGHT_ALT_PRESSED,
-	F.LEFT_CTRL_PRESSED,
-	F.RIGHT_CTRL_PRESSED,
-	F.SHIFT_PRESSED
+	LEFT_ALT_PRESSED,
+	RIGHT_ALT_PRESSED,
+	LEFT_CTRL_PRESSED,
+	RIGHT_CTRL_PRESSED,
+	SHIFT_PRESSED
 		)
 
 local Macro, FileName = Macro, ...
 
 local function setHandler(mkey, AKey, modsLen, mcr)
-	local	inp_rec = far.NameToInputRecord(AKey) or tryComboMod(AKey)
-	if not	inp_rec
+	local	base_inp_rec = far.NameToInputRecord(AKey) or tryComboMod(AKey)
+	if not	base_inp_rec
 	then    if OPT_DEBUG
 		then fnc_err_msg(("Unexpected AKey: %q"):format(AKey), mcr)
 		end
 		return
 	end
-	local	mod_state = band(inp_rec.ControlKeyState, MOD_MASK)
+	local	mods_only = base_inp_rec.UnicodeChar == "\0"
+	local	mod_state = band(base_inp_rec.ControlKeyState, MOD_MASK)
 	if	mod_state == 0
 	then    if OPT_DEBUG
-		then fnc_err_msg(("Unexpected ControlKeyState in %q: %q"):format(AKey, inp_rec.ControlKeyState), inp_rec)
+		then fnc_err_msg(("Unexpected ControlKeyState in %q: %q"):format(AKey, base_inp_rec.ControlKeyState), base_inp_rec)
 		end
 		return
 	end
 	-- http://bugs.farmanager.com/view.php?id=2947
 	if string.match(string.lower(AKey), "r?ctrlnumlock")
-	then	inp_rec = far.NameToInputRecord("Pause")
+	then	base_inp_rec = far.NameToInputRecord("Pause")
 	end
-	local base_vk = inp_rec.VirtualKeyCode
+	local base_vk = base_inp_rec.VirtualKeyCode
 	local handler_key = {
 		double	= { },
 		hold	= { },
@@ -246,13 +256,16 @@ local function setHandler(mkey, AKey, modsLen, mcr)
 			return	not	locked
 				and (   handler_key.priority[Area.Current:lower()]
 				or 	handler_key.priority.common
-					)
+						)
 		end,
 		action = function(mcr_src, p1, p2, p3)
-			local is_hld_vk, is_rls_mod, is_timeout, run_normal
+			local is_hld_vk, is_rls_mod, is_timeout, istimeout2, run_normal
 			is_hld_vk = isHolding(base_vk)
 			-- prevent autorepeat:
-			if is_hld_vk then return end
+			if is_hld_vk
+			then
+				return
+			end
 			killAutorepeat(base_vk)
 			local area = Area.Current:lower()
 			-- ?? inheritance (Autocompletion, Search)
@@ -262,15 +275,13 @@ local function setHandler(mkey, AKey, modsLen, mcr)
 		--	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
 			local next_key= "" 
 			local t_start = Far.UpTime
-			local mod_state_new
-			local t_hold_time
-			while not (is_timeout or next_key ~= "" or is_rls_mod)
+			local mod_state_new, mod_state_kb
+			while	true
 			do
-				is_rls_mod, mod_state_and, mod_state_new = isReleased(mod_state)
+				is_rls_mod, mod_state_and, mod_state_new, mod_state_kb = isReleased(mod_state)
 				if is_rls_mod	then break end
 				next_key = mf.waitkey(10)
-				t_hold_time = Far.UpTime
-				is_timeout = t_hold_time - t_start > OPT_DELAY
+				is_timeout = Far.UpTime - t_start > OPT_DELAY
 				if next_key~="" then break end
 				if is_timeout	then break end
 			end
