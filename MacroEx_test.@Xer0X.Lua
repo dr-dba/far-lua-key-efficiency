@@ -39,8 +39,12 @@ for ii, ii_key in ipairs({
 	"::Double",
 	-- error
 --	"qwerty-0",
+	"CtrlAltS:Hold",
+	"CtrlAltS:Double",
+	"CtrlAltS-CtrlAltS",
 	"CtrlAlt:Hold",
 	"CtrlAlt:Double",
+	"CtrlAlt-CtrlAlt",
 	"CtrlAlt-F8",
 	"CtrlF8-Alt"
 })
@@ -61,25 +65,33 @@ for ii, ii_key in ipairs({
 	test_mcr_key.."-"..test_mcr_key
 })
 do	Macro {	description = ii_key.." (Common) MacroEx example",
-		id = win.Uuid(win.Uuid()),
-		area = "Common",
-		key = ii_key,
-		priority = 100,
-		action = function(mcr_src) 
+		id	= win.Uuid(win.Uuid()),
+		area	= "Common",
+		key	= ii_key,
+		priority= 100,
+		action	= function(mcr_src)
 			far.Message(
-				"You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), 
+				"You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))),
 				mcr_src.description
-					) 
+					)
 		end
 	}
 end
 
-Macro {	description = "CtrlF9-AltF9 (Common) MacroEx example",
+Macro {	description = "CtrlF9-AltF9 (Viewer) MacroEx example",
 	id = win.Uuid(win.Uuid()),
-	area = "Common",
+	area = "Viewer",
 	key = "CtrlF9-AltF9",
 	priority = 100,
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description) end
+}
+
+Macro {	description = "CtrlF9-AltF9 (Editor) MacroEx example",
+	id = win.Uuid(win.Uuid()),
+	area = "Editor",
+	key = "CtrlF9-AltF9",
+	priority = 100,
+	action = function(mcr_src) far.Message("You pressed "..string.format("%s; %s / %s", AKey, mf.akey(1, 0), mf.akey(1, 1)), mcr_src.description) end
 }
 
 -- @@@@@
