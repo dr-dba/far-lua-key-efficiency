@@ -310,86 +310,83 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		local str_seq_chain
 		local key_seq = tbl_seq
 		repeat
-			repeat
-				fnc_status_set(a_key..(str_seq_chain or "").."-..?")
-				is_rls_mod = fnc_is_released(mod_state)
-				if	is_rls_mod
-				and	BREAK_SEQ_ON_MOD_RELEASE
-				then	run_normal = true
+			fnc_status_set(a_key..(str_seq_chain or "").."-..?")
+			is_rls_mod = fnc_is_released(mod_state)
+			if	is_rls_mod
+			and	BREAK_SEQ_ON_MOD_RELEASE
+			then	run_normal = true
+				break
+			end
+			if	next_key ~= ""
+			then
+				local	key2_run -- :that will be the key to launch
+				-- extract new received (next) key without modifiers:
+				local	key2 = str_match(next_key, end_key_fmt)
+				--[[ control state of received key is different
+				from the starting input, what want we do? ]]
+				if	key2 == ""
+				or	key2 == nil
+				-- looks like key state prefix was changed!
+				then	if	BREAK_SEQ_ON_MOD_RELEASE
+					-- on changing CtlAlt modifiers consider it as breaking sequence:
+					then	far.RestoreScreen(obj_scr); obj_scr = nil
+						run_normal = true
+						break
+					--[[ release of control (ctl+alt) keys allowed,
+					so we just take it as a whole:]]
+					else	key2_run = next_key
+					end
+				--[[ contol state in sequence key was not changed,
+				thus we run the read (received) key as it is:]]
+				else	key2_run = key2
+				end
+				local	key2_seq = key_seq[str_lower(key2_run)]
+				str_seq_chain = (str_seq_chain or "").."-"..key2_run
+				if	key2_seq
+				then	if	fnc_tbl_count(key2_seq.scripts) > 0
+					then	local mcr_run_res = runMacro(a_key, str_seq_chain)
+					end
+					if	fnc_tbl_count(key2_seq) - (key2_seq.scripts and 1 or 0) == 0
+					then	-- no further sequences
+						far.RestoreScreen(obj_scr); obj_scr = nil
+						return
+					else	-- continue to the nex sequenced key
+						key_seq = key2_seq
+					end
+				else	run_normal = true
+					far.RestoreScreen(obj_scr); obj_scr = nil
 					break
 				end
-				if	next_key ~= ""
-				then
-					local	key2_run -- :that will be the key to launch
-					-- extract new received (next) key without modifiers:
-					local	key2 = str_match(next_key, end_key_fmt)
-					--[[ control state of received key is different
-					from the starting input, what want we do? ]]
-					if	key2 == ""
-					or	key2 == nil
-					-- looks like key state prefix was changed!
-					then	if	BREAK_SEQ_ON_MOD_RELEASE
-						-- on changing CtlAlt modifiers consider it as breaking sequence:
-						then	far.RestoreScreen(obj_scr); obj_scr = nil
-							run_normal = true
-							break
-						--[[ release of control (ctl+alt) keys allowed,
-						so we just take it as a whole:]]
-						else	key2_run = next_key
-						end
-					--[[ contol state in sequence key was not changed,
-					thus we run the read (received) key as it is:]]
-					else	key2_run = key2
-					end
-					local	key2_seq = key_seq[str_lower(key2_run)]
-					str_seq_chain = (str_seq_chain or "").."-"..key2_run
-					if	key2_seq
-					then	if	fnc_tbl_count(key2_seq.scripts) > 0
-						then	local mcr_run_res = runMacro(a_key, str_seq_chain)
-						end
-						if	fnc_tbl_count(key2_seq) - (key2_seq.scripts and 1 or 0) == 0
-						then	-- no further sequences
-							far.RestoreScreen(obj_scr); obj_scr = nil
-							return
-						else	-- continue to the nex sequenced key
-							key_seq = key2_seq
-						end
-					else	run_normal = true
-						far.RestoreScreen(obj_scr); obj_scr = nil
-						break
-					end
-					--[[ an alternative way to define want we state breaking:
-					local key2_run = key2 ~= "" and key2 or next_key
-					--! false == BREAK_SEQ_ON_MOD_RELEASE
-					if	runMacro(a_key, "-"..key2_fix)
-					then	return
-					elseif	key2_fix ~= next_key
-					and	runMacro(a_key, "-"..next_key)
-					then	return
-					else	-- set timeout var to prevent key post..
-						is_timeout = true
-						run_normal = true
-					end
-					break --]]
-				end
-			--	try_seq_wait = true -- ? @Xer0x
-				next_key = mf.waitkey(10)
-				if next_key ~= ""
-				then tbl_insert(tbl_waitkeys, next_key)
-				end
-				if not	help_msg
-				and	Far.UpTime - t_start > OPT_DELAY_SEQ
-				then
+				--[[ an alternative way to define want we state breaking:
+				local key2_run = key2 ~= "" and key2 or next_key
+				--! false == BREAK_SEQ_ON_MOD_RELEASE
+				if	runMacro(a_key, "-"..key2_fix)
+				then	return
+				elseif	key2_fix ~= next_key
+				and	runMacro(a_key, "-"..next_key)
+				then	return
+				else	-- set timeout var to prevent key post..
 					is_timeout = true
-					help_msg = getSeqHelp(a_key)
-					if	help_msg
-					then	help_ret = far.Message(help_msg, a_key, "", "l")
-					else	run_normal = true
-						break
-					end
+					run_normal = true
 				end
-			until false
-			if run_normal then break end
+				break --]]
+			end
+		--	try_seq_wait = true -- ? @Xer0x
+			next_key = mf.waitkey(10)
+			if next_key ~= ""
+			then tbl_insert(tbl_waitkeys, next_key)
+			end
+			if not	help_msg
+			and	Far.UpTime - t_start > OPT_DELAY_SEQ
+			then
+				is_timeout = true
+				help_msg = getSeqHelp(a_key)
+				if	help_msg
+				then	help_ret = far.Message(help_msg, a_key, "", "l")
+				else	run_normal = true
+					break
+				end
+			end
 		until false
 		if obj_scr then far.RestoreScreen(obj_scr) end
 	end -- "if has_seq"
