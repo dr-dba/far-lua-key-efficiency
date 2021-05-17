@@ -29,7 +29,7 @@ local nfo = Info({
 	options = {
 		break_seq_on_mod_release= false,
 		allow_seq_with_any_mod	= true,
-		Delay		=  500,
+		Delay		=  500, 
 		DelaySeq	= 5000,
 		ext_modes 	= {
 			HLD	= true, -- holding
@@ -45,8 +45,6 @@ local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
 local OPT_DEBUG			= opts.Debug
 local OPT_DELAY_SEQ		= opts.DelaySeq
 local OPT_DELAY			= opts.Delay
-local fnc_case_title 	= Xer0X.fnc_case_title
-local fnc_case_toggle	= Xer0X.fnc_case_toggle
 local F	= far.Flags
 local C = far.Colors
 local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
@@ -54,7 +52,6 @@ local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
 local LEFT_CTRL_PRESSED	= F.LEFT_CTRL_PRESSED
 local RIGHT_CTRL_PRESSED= F.RIGHT_CTRL_PRESSED
 local SHIFT_PRESSED	= F.SHIFT_PRESSED
-
 local MOD_MASK = bor(
 	LEFT_ALT_PRESSED,
 	RIGHT_ALT_PRESSED,
@@ -83,9 +80,12 @@ then	tbl_mcr_env, tbl_mcr_exinf
 	Macro = tbl_mcr_env.Macro
 	Event = tbl_mcr_env.Event
 end
+
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
 local fnc_tbl_count	= Xer0X.fnc_tbl_count
+local fnc_case_title 	= Xer0X.fnc_case_title
+local fnc_case_toggle	= Xer0X.fnc_case_toggle
 
 local str_lower = utf8.Utf8_lower	or utf8.lower
 local str_upper = utf8.Utf8_upper	or utf8.upper
@@ -98,6 +98,7 @@ local str_sub	= utf8.sub
 local str_cfind = utf8.cfind
 local str_format= utf8.format
 local math_max	= math.max
+local mf_waitkey= mf.waitkey
 local tbl_concat= table.concat
 local tbl_insert= table.insert
 
@@ -155,11 +156,38 @@ local function fnc_is_released(mod_state)
 		Mouse.CtrlState
 end
 
-local function fnc_status_set(text_str, txt_color)
-	if type(text_str) ~= "string" then return end
-	far.Text(1, 0, txt_color or CLR_STATUS_TEXT, " "..text_str.." ")
+local fnc_status_set do
+local obj_timer_status = { tmr, txt }
+fnc_status_set = function(text_str, txt_color, ms_show_time, in_timer)
+	if not	in_timer
+	then	if	obj_timer_status.tmr
+		and not obj_timer_status.tmr.Closed
+		and (	obj_timer_status.txt ~= text_str
+		or	ms_show_time )
+		then	obj_timer_status.tmr:Close()
+			far.AdvControl("ACTL_REDRAWALL")
+		end
+		obj_timer_status.txt = text_str
+		if	ms_show_time
+		then	obj_timer_status.tmr = far.Timer(100, function(sender, t_show_start, text_str)
+				if	Far.UpTime - t_show_start > ms_show_time
+				or	obj_timer_status.txt ~= text_str
+				then	obj_timer_status.tmr:Close()
+					far.AdvControl("ACTL_REDRAWALL")
+				else	fnc_status_set(text_str, txt_color, nil, true)
+				end
+			end, Far.UpTime, text_str)
+		end
+	end
+	if	text_str
+	then	far.Text(
+			1, 0, txt_color or CLR_STATUS_TEXT,
+			text_str == "" and "" or " "..text_str.." "
+				)
+	end
 	far.Text()
-end
+end -- fnc_status_set
+end -- scope for status displaying
 
 -- ?? premake help or store macros
 local function getSeqHelp(seq_key)
@@ -198,7 +226,7 @@ end -- getSeqHelp
 
 local function runMacro(key, Ex)
 	local	eval_res = eval(key..Ex, 2)
-	return	eval_res ~= -2
+	return	eval_res ~= -2, eval_res
 end
 
 local function runMacroOrKey(key)
@@ -265,52 +293,64 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local tbl_seq = obj_handler.key_ext.SEQ 
 --	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
 	local next_key= "" -- have to be not null
+	local anassigned_msg
 	local tbl_waitkeys = { }
+	local function fnc_key_wait_save(...)
+		local	the_key = mf_waitkey(...)
+		if	the_key ~= ""
+		then	tbl_insert(tbl_waitkeys, the_key)
+		end
+		return	the_key
+	end
+
 	local t_start = Far.UpTime
 	repeat
 		is_rls_mod = fnc_is_released(mod_state)
 		if is_rls_mod	then break end
-		next_key = mf.waitkey(10)
+		next_key = fnc_key_wait_save(10)
 		is_timeout = Far.UpTime - t_start > OPT_DELAY
 		if next_key~="" then break end
 		if is_timeout	then break end
 	until false
-	if	next_key ~= ""
-	then	tbl_insert(tbl_waitkeys, next_key)
-	end
 	if	is_timeout
 	then
+		local msg_next_key = next_key and next_key ~= "" and str_format(", (%s)", next_key) or ""
 		if	has_hld
 		and	fnc_is_holding(base_vkc)
 		then	if runMacro(a_key, ":Hold")
-			then return
+			then    fnc_status_set(a_key..":Hold OK", nil, 1000)
+				return
+			else anassigned_msg = str_format("%s:Hold - Can't run%s", a_key, msg_next_key)
 			end
+		else	anassigned_msg = str_format("%s:Hold - No hold%s", a_key, msg_next_key)
 		end
 	elseif
 		has_dbl
 	and	next_key ~= ""
-	and	string.lower(next_key) == string.lower(a_key)
+	and	str_lower(next_key) == str_lower(a_key)
 	then
 		fnc_eat_autorep(base_vkc)
 		if runMacro(a_key, ":Double")
-		then return
+		then    fnc_status_set(a_key..":Double OK", nil, 1000)
+			return
+		else	anassigned_msg = str_format("%s:Double - Can't run", a_key)
 		end
 	end
 	if	tbl_seq
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
-		local a_key = mf.akey(1, 1)
+		a_key = mf.akey(1, 1)
+		fnc_status_set(a_key.."-..?")
 		local obj_scr = far.SaveScreen()
 		local end_key_fmt =
 			--[[ to require ending key with modifiers:
 			("^%s(.+)") --]]
 			("^%s(.*)") 
 			:format(state_key)
-		local help_msg, help_ret
-		local str_seq_chain
-		local key_seq = tbl_seq
+		local str_seq_chain, sz_seq_hlp_msg
+		local ii_key_seq = tbl_seq
 		repeat
-			fnc_status_set(a_key..(str_seq_chain or "").."-..?")
+			fnc_status_set(a_key..(str_seq_chain or "").."-..?", nil, 1000)
 			is_rls_mod = fnc_is_released(mod_state)
 			if	is_rls_mod
 			and	BREAK_SEQ_ON_MOD_RELEASE
@@ -326,11 +366,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				from the starting input, what want we do? ]]
 				if	key2 == ""
 				or	key2 == nil
-				-- looks like key state prefix was changed!
+				-- looks like key state prefix was changed
 				then	if	BREAK_SEQ_ON_MOD_RELEASE
 					-- on changing CtlAlt modifiers consider it as breaking sequence:
-					then	far.RestoreScreen(obj_scr); obj_scr = nil
-						run_normal = true
+					then	run_normal = true
 						break
 					--[[ release of control (ctl+alt) keys allowed,
 					so we just take it as a whole:]]
@@ -340,21 +379,28 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				thus we run the read (received) key as it is:]]
 				else	key2_run = key2
 				end
-				local	key2_seq = key_seq[str_lower(key2_run)]
 				str_seq_chain = (str_seq_chain or "").."-"..key2_run
-				if	key2_seq
-				then	if	fnc_tbl_count(key2_seq.scripts) > 0
-					then	local mcr_run_res = runMacro(a_key, str_seq_chain)
-					end
-					if	fnc_tbl_count(key2_seq) - (key2_seq.scripts and 1 or 0) == 0
-					then	-- no further sequences
+				local	obj_key2_seq = ii_key_seq[str_lower(key2_run)]
+				if	obj_key2_seq -- ? is it registered sequence key
+				then	fnc_status_set(str_format("%s%s Run ?", a_key, str_seq_chain), nil, 1000000)
+					local mcr_run_res =
+						-- the registered sequence is finalized here:
+						fnc_tbl_count(obj_key2_seq.scripts) > 0
+						-- .. so run it:
+						and { runMacro(a_key, str_seq_chain) }
+					-- have we any continue for the sequence?
+					if	fnc_tbl_count(obj_key2_seq) - (obj_key2_seq.scripts and 1 or 0) == 0
+					then	-- all done, no further sequences
 						far.RestoreScreen(obj_scr); obj_scr = nil
+						fnc_status_set(str_format("%s%s Run %s", a_key, str_seq_chain, mcr_run_res and mcr_run_res[2] or "NONE"), nil, 3000)
 						return
-					else	-- continue to the nex sequenced key
-						key_seq = key2_seq
+					else	-- continue to the next sequenced key
+						ii_key_seq = obj_key2_seq
 					end
-				else	run_normal = true
-					far.RestoreScreen(obj_scr); obj_scr = nil
+				else	--[[ the received key is not registered,
+					thus the sequence is broken,
+					run all previous keys as "normal" and exit:]]
+					run_normal = true
 					break
 				end
 				--[[ an alternative way to define want we state breaking:
@@ -371,19 +417,17 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				end
 				break --]]
 			end
-		--	try_seq_wait = true -- ? @Xer0x
-			next_key = mf.waitkey(10)
-			if next_key ~= ""
-			then tbl_insert(tbl_waitkeys, next_key)
-			end
-			if not	help_msg
+		--	try_seq_wait = true -- ? @Xer0X
+			next_key = fnc_key_wait_save(10)
+			if not	sz_seq_hlp_msg
 			and	Far.UpTime - t_start > OPT_DELAY_SEQ
 			then
 				is_timeout = true
-				help_msg = getSeqHelp(a_key)
-				if	help_msg
-				then	help_ret = far.Message(help_msg, a_key, "", "l")
+				sz_seq_hlp_msg = getSeqHelp(a_key)
+				if	sz_seq_hlp_msg
+				then	far.Message(sz_seq_hlp_msg, a_key, "", "l")
 				else	run_normal = true
+					anassigned_msg = str_format("%s%s No scripts assigned", a_key, str_seq_chain or "")
 					break
 				end
 			end
@@ -403,12 +447,17 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then runMacroOrKey(next_key)
 		end --]]
 		is_locked = false
+		fnc_status_set(anassigned_msg or str_format(
+			"%s anassigned, run_norm: %s, timeout: %s", 
+			a_key, tostring(run_normal), tostring(is_timeout)
+				), nil, 3000)
 		return
 	end
 	-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
-	fnc_status_set("anassigned")
+	fnc_status_set(anassigned_msg or a_key.." is anassigned", nil, 3000)
 	mf.beep()
-	win.Sleep(100)
+	--[[ needed?
+	win.Sleep(100) --]]
 end -- fnc_hnd_mcr_action
 
 -- register hotkey's handler
@@ -425,7 +474,7 @@ local function fnc_key_handler_set(key_area, key_full, key_base, ctl, alt, sft, 
 			or fnc_combo_mod_try(a_key)
 	if not	base_inp
 	then    if OPT_DEBUG
-		then fnc_err_msg(("Unexpected AKey: %q"):format(a_key), mcr)
+		then fnc_err_msg(("Unexpected AKey: %q"):format(a_key))
 		end
 		return
 	end
@@ -572,7 +621,7 @@ local function fnc_macro_ex_check_one(mcr, create_handlers)
 	if	create_handlers
 	then	fnc_macro_ex_create(tbl_res)
 	end
-	return	tbl_res
+	return tbl_res
 end -- fnc_macro_ex_check_one
 
 local function fnc_macro_ex_build_all()
@@ -584,7 +633,7 @@ local function fnc_macro_ex_build_all()
 		end
 	end
 	fnc_macro_ex_create(tbl_handlers)
-	return	tbl_handlers
+	return tbl_handlers
 end -- fnc_macro_ex_build_all
 
 --[=[ need to be the last call,
