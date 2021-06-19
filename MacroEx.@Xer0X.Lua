@@ -18,7 +18,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.3.0",
+	version_mod	= "1.3.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -26,7 +26,7 @@ local nfo = Info({
 	url_git		= "https://github.com/dr-dba/far-lua-key-efficiency",
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion	= { 3, 0, 0, 4430, 0 },
-	options = {
+	options		= {
 		break_seq_on_mod_release
 				= false,
 		allow_seq_with_any_mod
@@ -101,11 +101,11 @@ local mf_waitkey= mf.waitkey
 local tbl_concat= table.concat
 local tbl_insert= table.insert
 
-local KEY_VIS_FMT = "c:%s/a:%s/s:%s/p:%s"
+local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 -- C.COL_MENUTITLE
-local CLR_STATUS_TEXT = far.AdvControl(F.ACTL_GETCOLOR, C.COL_MENUHIGHLIGHT)
-
-local	tbl_handlers = Xer0X.tbl_macro_ex_handlers
+local CLR_STATUS_TEXT	= far.AdvControl(F.ACTL_GETCOLOR, C.COL_MENUHIGHLIGHT)
+local obj_status	= Xer0X.obj_screen_status_line
+local	tbl_handlers	= Xer0X.tbl_macro_ex_handlers
 if not	tbl_handlers
 then	tbl_handlers = { }
 	Xer0X.tbl_macro_ex_handlers = tbl_handlers
@@ -154,54 +154,6 @@ local function fnc_is_released(mod_state)
 		mod_last,
 		Mouse.CtrlState
 end
-
-local obj_status = {
-	stop = function(self)
-		self.timer:Close()
-	end,
-	start = function(self)
-		self:set(self.text_show, self.color_txt, self.time_show)
-	end,
-	is_run = function(self)
-		return self.timer and not self.timer.Closed
-	end,
-	set = function(self, text_str, txt_color, ms_show_time, in_timer)
-		if not	in_timer
-		then	if	self.timer
-			and not self.timer.Closed
-			and (	self.text ~= text_str
-			or	ms_show_time
-			or not	text_str)
-			then	self.timer:Close()
-				far.AdvControl("ACTL_REDRAWALL")
-			end
-			if	self.text_show ~= text_str
-			then	self.text_show  = text_str
-				self.color_txt  = txt_color
-				self.time_show  = ms_show_time
-			end
-			if	ms_show_time
-			and	text_str
-			then	self.timeStart = Far.UpTime
-				self.timer = far.Timer(100, function(sender, t_show_start, text_str)
-					if type(ms_show_time) == "number"
-					and	ms_show_time < Far.UpTime - t_show_start
-					then	self.timer:Close()
-						far.AdvControl("ACTL_REDRAWALL")
-					else	self:set(text_str, txt_color, nil, true)
-					end
-				end, self.timeStart, self.text_show)
-			end
-		end
-		if text_str
-		then far.Text(
-			1, 0, txt_color or CLR_STATUS_TEXT,
-			text_str == "" and "" or " "..text_str.." "
-				)
-		end
-		far.Text()
-	end -- fnc_status_set
-} 
 
 local tbl_key_hlp_cache = { }
 -- ?? premake help or store macros
@@ -323,14 +275,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
-	local was_hld, was_dbl, is_rls_mod, is_timeout, run_normal, anassigned_msg
+	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, is_timeout, run_normal, anassigned_msg, a_key_show, a_key_real
 	local t_key_ex_start = Far.UpTime
 	local area = str_lower(Area.Current)
 	-- ?? inheritance (AutoCompletion, Search)
 	local next_key = "" -- have to be not null
 	local t_wait_key = t_key_ex_start
-
-
 	local has_dbl = obj_handler.key_ext.DBL 
 	local has_hld = obj_handler.key_ext.HLD 
 --	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
@@ -363,7 +313,6 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			return
 		end
 	end
-
 	local	has_seq
 	if	ALLOW_SEQ_IN_EXT
 	and	ext_hld
@@ -384,9 +333,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	if	has_seq
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
-		a_key = mf.akey(1, 1)..(
-			has_hld and was_hld and ":Hold"	or
-			has_dbl and was_dbl and ":Double" or
+		a_key_real = mf.akey(1, 0)
+		a_key_show = mf.akey(1, 1)..(
+			ext_hld and ":Hold"	or
+			ext_dbl and ":Double"	or
 			"")
 		local obj_scr = far.SaveScreen()
 		local end_key_fmt =
@@ -398,7 +348,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		local t_last_key = t_wait_key
 		local ii_key_seq = has_seq
 		repeat
-			obj_status:set(a_key..(str_seq_chain or "").."-..?", nil, 1000)
+			obj_status:set(a_key_show..(str_seq_chain or "").."-..?", nil, 1000)
 			is_rls_mod = fnc_is_released(mod_state)
 			if	is_rls_mod
 			and	BREAK_SEQ_ON_MOD_RELEASE
@@ -410,12 +360,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				if t_wait_key - t_last_key > OPT_DELAY_SEQ
 				then
 					is_timeout = true
-					seq_hlp_msg = fnc_get_seq_hlp(a_key)
+					seq_hlp_msg = fnc_get_seq_hlp(a_key_show)
 					if	seq_hlp_msg
 					then	obj_status:stop()
-						far.Message(seq_hlp_msg, a_key, "", "l")
+						far.Message(seq_hlp_msg, a_key_show, "", "l")
 					else	run_normal = true
-						anassigned_msg = str_format("%s%s No scripts assigned", a_key, str_seq_chain or "")
+						anassigned_msg = str_format("%s%s No scripts assigned", a_key_show, str_seq_chain or "")
 						break
 					end
 				end
@@ -448,14 +398,15 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					str_seq_chain = (str_seq_chain or "").."-"..next_key
 				end
 				if	obj_key2_seq -- ? is it registered sequence key
-				then	obj_status:set(str_format("%s%s Run ?", a_key, str_seq_chain), nil, 1000000)
+				then	obj_status:set(str_format("%s%s Run ?", a_key_show, str_seq_chain), nil, 1000000)
 					if 	obj_key2_seq.scripts
 					and	obj_key2_seq.scripts.exists > 0
-					-- the registered sequence is finalized here:
-					-- .. so run it:
-					then	local eval_ok, eval_res = runMacro(a_key, str_seq_chain)
+					--[[ the registered sequence is finalized here:
+						fnc_tbl_count(obj_key2_seq.scripts) > 0
+					.. so run it:]]
+					then	local eval_ok, eval_res = runMacro(a_key_show, str_seq_chain)
 						far.RestoreScreen(obj_scr); obj_scr = nil
-						obj_status:set(str_format("%s%s Run %s", a_key, str_seq_chain, eval_res), nil, 3000)
+						obj_status:set(str_format("%s%s Run %s", a_key_show, str_seq_chain, eval_res), nil, 3000)
 						return
 					end
 					--[[ have we any continue for the sequence?
@@ -475,10 +426,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				--[[ an alternative way to define want we state breaking:
 				local key2_run = key2 ~= "" and key2 or next_key
 				--! false == BREAK_SEQ_ON_MOD_RELEASE
-				if	runMacro(a_key, "-"..key2_fix)
+				if	runMacro(a_key_show, "-"..key2_fix)
 				then	return
 				elseif	key2_fix ~= next_key
-				and	runMacro(a_key, "-"..next_key)
+				and	runMacro(a_key_show, "-"..next_key)
 				then	return
 				else	-- set timeout var to prevent key post..
 					is_timeout = true
@@ -494,7 +445,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	or	run_normal
 	then
 		is_locked = true
-		local run_res = runMacroOrKey(a_key)
+		local run_res = runMacroOrKey(a_key_real)
 		for ii = 1, #obj_waitkeys.keys
 		do run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 		end
