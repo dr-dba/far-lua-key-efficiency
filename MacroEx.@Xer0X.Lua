@@ -18,7 +18,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.3.1",
+	version_mod	= "1.3.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -156,15 +156,16 @@ end
 local tbl_key_hlp_cache = { }
 -- ?? premake help or store macros
 local function fnc_get_seq_hlp(seq_key)
-	if tbl_key_hlp_cache[seq_key] ~= nil
-	then return tbl_key_hlp_cache[seq_key]
+	local	txt_help = tbl_key_hlp_cache[seq_key]
+	if	txt_help ~= nil
+	then	return txt_help
 	end
 	local tbl_help	= { }
 	local area_re	= "%f[%a]"..string.lower(Area.Current).."%f[%A]"
 	local key_re	= "%f[%a]"..string.lower(seq_key).."%-"
-	for ii = 1, math.huge
+	for ii = 1, #Xer0X.utils.LoadedMacros
 	do
-		local	ii_mcr = mf.GetMacroCopy(ii)
+		local	ii_mcr = Xer0X.utils.LoadedMacros[ii] 
 		if not	ii_mcr then break end
 		-- ?? use GetMacro
 		if	ii_mcr.key
@@ -189,7 +190,7 @@ local function fnc_get_seq_hlp(seq_key)
 			end
 		end
 	end
-	local txt_help = next(tbl_help) and table.concat(tbl_help, "\n")
+	txt_help = next(tbl_help) and table.concat(tbl_help, "\n") or false
 	tbl_key_hlp_cache[seq_key] = txt_help
 	return txt_help
 end -- fnc_get_seq_hlp
