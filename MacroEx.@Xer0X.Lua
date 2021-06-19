@@ -97,13 +97,11 @@ local str_sub	= utf8.sub
 local str_cfind = utf8.cfind
 local str_format= utf8.format
 local math_max	= math.max
-local mf_waitkey= mf.waitkey
 local tbl_concat= table.concat
 local tbl_insert= table.insert
+local mf_waitkey= mf.waitkey
 
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
--- C.COL_MENUTITLE
-local CLR_STATUS_TEXT	= far.AdvControl(F.ACTL_GETCOLOR, C.COL_MENUHIGHLIGHT)
 local obj_status	= Xer0X.obj_screen_status_line
 local	tbl_handlers	= Xer0X.tbl_macro_ex_handlers
 if not	tbl_handlers
