@@ -9,7 +9,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.5", 
+	version_mod	= "0.6", 
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -47,11 +47,13 @@ for ii, ii_key in ipairs({
 	"CtrlAltS:Double",
 	"CtrlAltS-CtrlAltS",
 	"CtrlAlt-CtrlAlt",
+	"x-y-z",
 	"CtrlAlt-Alt",
-	"CtrlAlt:Double",
+	"CtrlS:Double-F3-F2-F1",
 	"CtrlAlt:Hold",
---	"CtrlAlt-F8",
-	"CtrlAlt-F8-F7-F6-F5",
+	"CtrlAlt-F8",
+	"CtrlAlt-F7-F6-F5",
+	"CtrlAlt-F3-F3-F3",
 	"CtrlF8-Alt"
 })
 do
