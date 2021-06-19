@@ -1,13 +1,17 @@
 --[[
 if true then return end --]]
 
---[[ DEPENDS ON MODULES:
+--[[
+DEPENDS ON MODULES:
 https://github.com/dr-dba/far-lua-internals
 introspection-@Xer0X.lua
 https://github.com/dr-dba/far-lua-general-utils
 Lib-Common-@Xer0X.Lua
 https://github.com/dr-dba/far-lua-diagnostics
 StackTracePlusPlus-@Xer0X.Lua
+
+TODO
+
 ]]
 -- luacheck: ignore 113/Info
 local Info = Info or package.loaded.regscript or function(...) return ... end
@@ -18,7 +22,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.3.2",
+	version_mod	= "1.3.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -100,6 +104,7 @@ local math_max	= math.max
 local tbl_concat= table.concat
 local tbl_insert= table.insert
 local mf_waitkey= mf.waitkey
+local win_uuid	= win.Uuid
 
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 local obj_status	= Xer0X.obj_screen_status_line
@@ -274,7 +279,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
-	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, is_timeout, run_normal, anassigned_msg, a_key_show, a_key_real
+	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, is_timeout, run_normal, anassigned_msg
+	local a_key_real = mf.akey(1, 0)
+	local a_key_show = mf.akey(1, 1)
 	local t_key_ex_start = Far.UpTime
 	local area = str_lower(Area.Current)
 	-- ?? inheritance (AutoCompletion, Search)
@@ -332,8 +339,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	if	has_seq
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
-		a_key_real = mf.akey(1, 0)
-		a_key_show = mf.akey(1, 1)..(
+		a_key_show = a_key_show..(
 			ext_hld and ":Hold"	or
 			ext_dbl and ":Double"	or
 			"")
@@ -609,7 +615,7 @@ end -- fnc_key_build
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_res = { }
-	local id_ext = obj_mcr.id ~= "<no id>" and obj_mcr.id or str_upper(win.Uuid(win.Uuid()))
+	local id_ext = obj_mcr.id ~= "<no id>" and obj_mcr.id or str_upper(win_uuid(win_uuid()))
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s+", true))
 	do	local tbl_ext = { }
 		local tbl_ext_jj = tbl_ext
@@ -633,26 +639,30 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			if not	jj_key_base
 			then	jj_key_base = jj_key_seq
 			end
-			if	jj_ext_mode
-			then	tbl_ext_jj[jj_ext_mode] = { }
-				if	ALLOW_SEQ_IN_EXT
-				then	tbl_ext_jj = tbl_ext_jj[jj_ext_mode]
-				end
-			end
 			if	jj == 1
 			then	ii_key_trig = jj_key_base
-			else	tbl_ext_jj.SEQ = { [jj_key_base] = { } }
-				tbl_ext_jj = tbl_ext_jj.SEQ[jj_key_base]
+				if	jj_ext_mode
+				then	tbl_ext_jj[jj_ext_mode] = { }
+					if	ALLOW_SEQ_IN_EXT
+					then	tbl_ext_jj = tbl_ext_jj[jj_ext_mode]
+					end
+				end
+			else	if	jj_ext_mode
+				then	tbl_ext_jj.SEQ = { [jj_key_base] = { [jj_ext_mode] = { } } }
+				else	tbl_ext_jj.SEQ = { [jj_key_base] = { } }
+				end
+				if	jj_ext_mode
+				and	ALLOW_SEQ_IN_EXT
+				then	tbl_ext_jj = tbl_ext_jj.SEQ[jj_key_base][jj_ext_mode]
+				else	tbl_ext_jj = tbl_ext_jj.SEQ[jj_key_base]
+				end
 			end
 		end
-		if	jj_ext_mode
-		or	tbl_ext_jj ~= tbl_ext
+		if	tbl_ext.SEQ
+		or	tbl_ext.DBL
+		or	tbl_ext.HLD
 		then	-- the last part of key sequence:
-			if	ALLOW_SEQ_IN_EXT
-			or not	jj_ext_mode
-			then	tbl_ext_jj.scripts = { [id_ext] = obj_mcr }
-			else	tbl_ext_jj[jj_ext_mode].scripts = { [id_ext] = obj_mcr }
-			end
+			tbl_ext_jj.scripts = { [id_ext] = obj_mcr }
 			if not	obj_mcr.id
 			or	obj_mcr.id == "<no id>"
 			-- have to have id, i.e. reloading or detecting
