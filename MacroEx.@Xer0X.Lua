@@ -22,7 +22,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.3.3",
+	version_mod	= "1.3.4",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -279,7 +279,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
-	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, is_timeout, run_normal, anassigned_msg
+	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod, is_timeout, run_normal, anassigned_msg
+	local is_hld, vkc_now
 	local a_key_real = mf.akey(1, 0)
 	local a_key_show = mf.akey(1, 1)
 	local t_key_ex_start = Far.UpTime
@@ -293,11 +294,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	if	has_dbl
 	or	has_hld
 	then	repeat
-			is_rls_mod = fnc_is_released(mod_state)
+			is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod = fnc_is_released(mod_state)
 			if is_rls_mod	then break end
 			next_key, t_wait_key = obj_waitkeys:save(10)
-			is_timeout = t_wait_key - t_key_ex_start > OPT_DELAY
 			if next_key~="" then break end
+			is_timeout = t_wait_key - t_key_ex_start > OPT_DELAY
 			if is_timeout	then break end
 		until false
 		was_hld = is_timeout and fnc_is_holding(base_vkc)
