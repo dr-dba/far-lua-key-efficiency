@@ -7,10 +7,9 @@ http://forum.farmanager.com/viewtopic.php?f=15&t=12459<br />
 DEPENDS ON MODULES:<br />
 -------------------<br />
 https://github.com/dr-dba/far-lua-internals<br />
-introspection-@Xer0X.lua<br />
-<br />
+introspection<br /><br />
 https://github.com/dr-dba/far-lua-general-utils<br />
-Lib-Common-@Xer0X.Lua<br />
-<br />
+Lib-Common<br /><br />
 https://github.com/dr-dba/far-lua-diagnostics<br />
-StackTracePlusPlus-@Xer0X.Lua<br />
+StackTracePlusPlus<br /><br />
+
