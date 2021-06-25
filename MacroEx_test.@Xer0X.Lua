@@ -1,5 +1,6 @@
 --[[
 if true then return end --]]
+
 local Info = Info or package.loaded.regscript or function(...) return ... end -- luacheck: ignore 113/Info
 local nfo = Info {
 	_filename or ...,
@@ -8,7 +9,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6",
+	version_mod	= "0.6.1",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -51,20 +52,18 @@ for ii, ii_key in ipairs({
 	"CtrlAlt-Alt",
 	"CtrlS:Double-F3-F2-F1",
 	"CtrlS:Hold-F3-F2:Double-F1",
-	"CtrlS:Hold-F3-F2-F1",
-	"CtrlS-F3-F2-F1",
 	"CtrlAlt:Hold",
-	"CtrlAlt-F8",
+	"CtrlAlt:Hold-F3-F2-F1",
+	"CtrlAlt-CtrlAlt-F8",
 	"CtrlAlt-F7-F6-F5",
-	"CtrlAlt-F3-F3-F3",
+	"CtrlAlt-F3-F3-F3 CtrlAlt:Double-F4-F4-F4-F4",
 	"CtrlF8-Alt"
 })
-do
-	Macro { description = "Example MacroEx: "..ii_key,
+do	Macro { description = "Example MacroEx: "..ii_key,
 		id = win.Uuid(win.Uuid()),
 		area = "Editor",
 		key = ii_key,
-		action = function() far.Message(ii_key, "Pressed") end
+		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
 	}
 end
 
