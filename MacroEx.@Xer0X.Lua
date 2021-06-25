@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.3.4",
+	version_mod	= "1.3.5",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -297,12 +297,12 @@ end -- fnc_key_expand
 local function fnc_key_equal(key_base, key_comp)
 	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, true)
 	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, true)
-	for ii_base in pairs(tbl_base) do
-	for ii_comp in pairs(tbl_comp) do
+	for ii_base, ii_base_val in pairs(tbl_base) do
+	for ii_comp, ii_comp_val in pairs(tbl_comp) do
 	if	str_lower(ii_base)
 	==	str_lower(ii_comp)
 	then return
-		str_lower(ii_comp)
+		str_lower(ii_comp), ii_comp_val
 	end
 	end
 	end
@@ -408,11 +408,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			("^%s(.+)") --]]
 			("^%s(.*)") 
 			:format(obj_handler.base_key.cas)
-		local str_seq_chain, seq_hlp_msg
+		local sz_seq_chain, seq_hlp_msg
 		local t_last_key = t_wait_key
 		local ii_key_seq = has_seq
 		repeat
-			obj_status:set(a_key_show..(str_seq_chain or "").."-..?", nil, 1000)
+			obj_status:set(a_key_show..(sz_seq_chain or "").."-..?", nil, 1000)
 			is_rls_mod = fnc_is_released(mod_state)
 			if	is_rls_mod
 			and	BREAK_SEQ_ON_MOD_RELEASE
@@ -429,7 +429,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					then	obj_status:stop()
 						far.Message(seq_hlp_msg, a_key_show, "", "l")
 					else	run_normal = true
-						anassigned_msg = str_format("%s%s No scripts assigned", a_key_show, str_seq_chain or "")
+						anassigned_msg = str_format("%s%s No scripts assigned", a_key_show, sz_seq_chain or "")
 						break
 					end
 				end
@@ -455,21 +455,29 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				thus we run the read (received) key as it is:]]
 				else	key2_run = key2
 				end
-				local	obj_key2_seq = ii_key_seq[str_lower(key2_run)]
+				local	key2_run_exp = fnc_key_expand(key2_run, true, true)
+				local	next_key_exp, key2_run_seq
+				local	str_next_seq,
+					obj_key2_seq = fnc_key_equal(key2_run_exp, ii_key_seq)
 				if	obj_key2_seq
-				then	str_seq_chain = (str_seq_chain or "").."-"..key2_run
-				else	obj_key2_seq = ii_key_seq[str_lower(next_key)]
-					str_seq_chain = (str_seq_chain or "").."-"..next_key
+				then	key2_run_seq = true
+				elseif	next_key ~= key2_run
+				and not BREAK_SEQ_ON_MOD_RELEASE
+				then 
+					next_key_exp = fnc_key_expand(next_key, true, true)
+					str_next_seq,
+					obj_key2_seq = fnc_key_equal(next_key_exp, ii_key_seq)
 				end
 				if	obj_key2_seq -- ? is it registered sequence key
-				then	obj_status:set(str_format("%s%s Run ?", a_key_show, str_seq_chain), nil, 1000000)
+				then	sz_seq_chain = (sz_seq_chain or "").."-"..(key2_run_seq and key2_run or next_key)
+					obj_status:set(str_format("%s%s Run ?", a_key_show, sz_seq_chain), nil, 1000000)
 					if 	obj_key2_seq.SCR
 					--[[ the registered sequence is finalized here:
 						fnc_tbl_count(obj_key2_seq.SCR) > 0
 					.. so run it:]]
-					then	local eval_ok, eval_res = runMacro(a_key_show, str_seq_chain)
+					then	local eval_ok, eval_res = runMacro(a_key_show, sz_seq_chain)
 						far.RestoreScreen(obj_scr); obj_scr = nil
-						obj_status:set(str_format("%s%s Run %s", a_key_show, str_seq_chain, eval_res), nil, 3000)
+						obj_status:set(str_format("%s%s Run %s", a_key_show, sz_seq_chain, eval_res), nil, 3000)
 						return
 					end
 					--[[ have we any continue for the sequence?
