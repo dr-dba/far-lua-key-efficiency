@@ -3,16 +3,29 @@ if true then return end --]]
 
 --[[
 DEPENDS ON MODULES:
+
 https://github.com/dr-dba/far-lua-internals
 introspection-@Xer0X.lua
+
 https://github.com/dr-dba/far-lua-general-utils
 Lib-Common-@Xer0X.Lua
+
 https://github.com/dr-dba/far-lua-diagnostics
 StackTracePlusPlus-@Xer0X.Lua
 
-TODO
-
+TODO:
+* check Allow_Seq_in_Ext=FALSE
+* improve help, take it from the current SEQ table downward
+* add "txp" - expanded keys table for SEQ.<KEY>,
+	i.e. "SEQ.<KEY>.txp".
+	this gives left and right alt/ctrl keys specifics.
+* result of running of macro,
+	 which condition function returned false?
+* ALL table for each level to save there scripts
 ]]
+
+-- ### OPTIONS BLOCK ###
+
 -- luacheck: ignore 113/Info
 local Info = Info or package.loaded.regscript or function(...) return ... end
 local nfo = Info({
@@ -47,6 +60,9 @@ local nfo = Info({
 })
 if not nfo then return end
 local opts = nfo.options
+
+-- @@@ END OF THE OPTIONS BLOCK @@@
+
 local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
 local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
 local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
@@ -107,6 +123,7 @@ local mf_waitkey= mf.waitkey
 local win_uuid	= win.Uuid
 
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
+local KEY_STR_FMT	= "%s%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local	tbl_handlers	= Xer0X.tbl_macro_ex_handlers
 if not	tbl_handlers
@@ -166,8 +183,8 @@ local function fnc_get_seq_hlp(seq_key)
 	then	return txt_help
 	end
 	local tbl_help	= { }
-	local area_re	= "%f[%a]"..string.lower(Area.Current).."%f[%A]"
-	local key_re	= "%f[%a]"..string.lower(seq_key).."%-"
+	local area_re	= "%f[%a]"..str_lower(Area.Current).."%f[%A]"
+	local key_re	= "%f[%a]"..str_lower(seq_key).."%-"
 	for ii = 1, #Xer0X.utils.LoadedMacros
 	do
 		local	ii_mcr = Xer0X.utils.LoadedMacros[ii] 
@@ -214,15 +231,15 @@ end
 
 local rgx_combo = regex.new("^((?:[rl]?ctrl)?(?:[rl]?alt)?(?:shift)?)((?:shift)|(?:alt))$", "i")
 local function fnc_combo_mod_try(key)
-	local	combo_mod, combo_key = rgx_combo:match(key)
+	local	combo_mod, 
+		combo_key = rgx_combo:match(key)
 	if	combo_mod
 	then	local	m = far.NameToInputRecord(combo_mod.."a")
 		local	k = far.NameToInputRecord(combo_key)
-		if	m and k
-		then	return {
-				ControlKeyState	= m.ControlKeyState,
-				VirtualKeyCode	= k.VirtualKeyCode
-			}
+		if	m
+		and	k
+		then	return {ControlKeyState	= m.ControlKeyState,
+				VirtualKeyCode	= k.VirtualKeyCode}
 		end
 	end
 end -- fnc_combo_mod_try
@@ -272,7 +289,6 @@ local obj_waitkeys = {
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local base_inp	= obj_handler.base_inp
 	local mod_state = obj_handler.mod_state
-	local state_key = obj_handler.state_key.str
 	local a_key	= obj_handler.a_key
 	local m_key	= obj_handler.m_key
 	local base_vkc	= base_inp.VirtualKeyCode
@@ -280,7 +296,6 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
 	local was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod, is_timeout, run_normal, anassigned_msg
-	local is_hld, vkc_now
 	local a_key_real = mf.akey(1, 0)
 	local a_key_show = mf.akey(1, 1)
 	local t_key_ex_start = Far.UpTime
@@ -306,15 +321,13 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		ext_hld = was_hld and has_hld
 		ext_dbl = was_dbl and has_dbl
 		if	ext_hld
-		and	has_hld.scripts
-		and     has_hld.scripts.exists > 0
+		and	has_hld.SCR
 		then    local eval_ok, eval_res = runMacro(a_key, ":Hold")
 			obj_status:set(a_key..":Hold "..eval_res, nil, 1000)
 			return
 		end
 		if	ext_dbl
-		and	has_dbl.scripts
-		and	has_dbl.scripts.exists > 0
+		and	has_dbl.SCR
 		then	local eval_ok, eval_res = runMacro(a_key, ":Double")
 			obj_status:set(a_key..":Double "..eval_res, nil, 1000)
 			return
@@ -349,7 +362,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			--[[ to require ending key with modifiers:
 			("^%s(.+)") --]]
 			("^%s(.*)") 
-			:format(state_key)
+			:format(obj_handler.state_key.str)
 		local str_seq_chain, seq_hlp_msg
 		local t_last_key = t_wait_key
 		local ii_key_seq = has_seq
@@ -405,10 +418,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				end
 				if	obj_key2_seq -- ? is it registered sequence key
 				then	obj_status:set(str_format("%s%s Run ?", a_key_show, str_seq_chain), nil, 1000000)
-					if 	obj_key2_seq.scripts
-					and	obj_key2_seq.scripts.exists > 0
+					if 	obj_key2_seq.SCR
 					--[[ the registered sequence is finalized here:
-						fnc_tbl_count(obj_key2_seq.scripts) > 0
+						fnc_tbl_count(obj_key2_seq.SCR) > 0
 					.. so run it:]]
 					then	local eval_ok, eval_res = runMacro(a_key_show, str_seq_chain)
 						far.RestoreScreen(obj_scr); obj_scr = nil
@@ -473,13 +485,21 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	win.Sleep(100) --]]
 end -- fnc_hnd_mcr_action
 
-local function fnc_copy_key_ext(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
-	if	copy_key_idx == "id"
-	-- that is macro object to merge:
-	and	copy_key_val == tbl_from_loc.id
-	then	tbl_dest.exists = (tbl_dest.exists or 0) + 1
+local function fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	if type(copy_key_idx) == "number"
+	and	copy_key_idx <= #tbl_from_loc
+	then	tbl_dest_loc[#tbl_dest_loc + 1] = copy_key_val
+	else	tbl_dest_loc[copy_key_idx]	= copy_key_val
 	end
-	tbl_dest_loc[copy_key_idx] = copy_key_val
+	return true
+end
+
+local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	if	copy_key_val.action
+	and	copy_key_val.key
+	and	copy_key_val.area
+	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	end
 end
 
 -- register hotkey's handler
@@ -523,7 +543,6 @@ local function fnc_key_handler_set(key_area, key_full, key_base, ctl, alt, sft, 
 			base_inp	= base_inp,
 			mod_state	= band(base_inp.ControlKeyState, MOD_MASK),
 			key_ext		= { },
-			macros		= { },
 			fnc_condition	= function(rec_key, mcr_src)
 				return fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 			end,
@@ -534,11 +553,7 @@ local function fnc_key_handler_set(key_area, key_full, key_base, ctl, alt, sft, 
 		tbl_handlers[m_key] = obj_handler
 	end
 	obj_handler.priority = math_max(obj_handler.priority or 0, (obj_mcr.priority or 50) + 5)
-	obj_handler.key_ext = fnc_tbl_copy_to(tbl_ext, obj_handler.key_ext, fnc_copy_key_ext)
-	if not	obj_handler.macros[key_full]
-	then	obj_handler.macros[key_full] = { [obj_mcr.id] = obj_mcr }
-	else	obj_handler.macros[key_full][obj_mcr.id] = obj_mcr
-        end
+	obj_handler.key_ext = fnc_tbl_copy_to(tbl_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
 	return obj_handler
 end -- fnc_key_handler_set
 
@@ -563,25 +578,27 @@ local function fnc_macro_ex_create(tbl_handlers)
 			FileName	= FileName,
 		}
 	end
-end
+end -- fnc_macro_ex_create
 
 local function fnc_key_expand(key_base, in_lower)
 --	assert(key:match("^%l+$"))
 	local RLctl, RLalt, shift, plain = rgx_key_parse:match(str_lower(key_base))
 	local tbl_exp = { }
-	local ctl, alt
+	local ctl, alt, sft, ctl2, alt2, key
 	ctl = RLctl == "" and (in_lower and "l" or "L")
 	repeat
 	alt = RLalt == "" and (in_lower and "l" or "L")
 	repeat
-	local tbl_key = {
-		ctl = ctl or RLctl,
-		alt = alt or RLalt,
-		sft = shift,
-		key = plain or "",
-	}
-	tbl_key.str = str_lower(str_format(KEY_VIS_FMT, tbl_key.ctl or "0", tbl_key.alt or "0", tbl_key.sft or "0", tbl_key.key))
-	tbl_exp[tbl_key.str] = tbl_key
+	ctl2 = ctl or RLctl
+	alt2 = alt or RLalt
+	key = plain or ""
+	local tbl_key = { ctl = ctl2, alt = alt2, sft = shift, key = key }
+	tbl_key.vis = str_lower(str_format(KEY_VIS_FMT, ctl2 or 0, alt2 or 0, shift and 1 or 0, plain or "<NONE>"))
+	tbl_key.str = str_lower(str_format(KEY_STR_FMT,
+		ctl2 and ctl2.."ctl" or "",
+		alt2 and alt2.."alt" or "",
+		shift or "", key))
+	tbl_exp[tbl_key.vis] = tbl_key
 	alt = str_lower(alt or "") == "l" and (in_lower and "r" or "R")
 	until not alt
 	ctl = str_lower(ctl or "") == "l" and (in_lower and "r" or "R")
@@ -608,7 +625,8 @@ local function fnc_key_build(key_area, key_full, key_base, tbl_ext, obj_mcr)
 	local tbl_ret = { }
 	local tbl_exp = fnc_key_expand(key_base)
 	for ii, ii_key in pairs(tbl_exp)
-	do tbl_ret[ii_key.str] = fnc_key_handler_set(key_area, key_full, key_base, ii_key.ctl, ii_key.alt, ii_key.sft, ii_key.key, tbl_ext, obj_mcr)
+	do	tbl_ext.KXP = { [ii] = ii_key }
+		tbl_ret[ii_key.vis] = fnc_key_handler_set(key_area, key_full, key_base, ii_key.ctl, ii_key.alt, ii_key.sft, ii_key.key, tbl_ext, obj_mcr)
 	end
 	return tbl_ret
 end -- fnc_key_build
@@ -620,6 +638,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s+", true))
 	do	local tbl_ext = { }
 		local tbl_ext_jj = tbl_ext
+		local tbl_key_ii = { }
 		local ii_key_trig, jj_key_base, jj_ext_mode
 		if str_match(ii_key, "^%-") then ii_key = str_gsub(ii_key, "^%-", "<MINUS>") end
 		if str_match(ii_key, "%-$") then ii_key = str_gsub(ii_key, "%-$", "<MINUS>") end
@@ -628,6 +647,8 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		for	jj_key_seq in	str_gmatch(ii_key.."-", "([^-]*)-")
 		do	jj_key_seq =	str_gsub(jj_key_seq, "<MINUS>", "-")
 			jj = jj + 1
+			tbl_key_ii[#tbl_key_ii + 1] = jj_key_seq
+			tbl_ext_jj.ALL = { obj_mcr, [ii_key] = { obj_mcr } }
 			jj_key_base, jj_ext_mode = str_match(jj_key_seq, "^(.+):(.+)$")
 			if	jj_ext_mode
 			then	-- here ext_mode supposed to be HLD or DBL
@@ -648,9 +669,10 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 					then	tbl_ext_jj = tbl_ext_jj[jj_ext_mode]
 					end
 				end
-			else	if	jj_ext_mode
-				then	tbl_ext_jj.SEQ = { [jj_key_base] = { [jj_ext_mode] = { } } }
-				else	tbl_ext_jj.SEQ = { [jj_key_base] = { } }
+			else	local	tbl_key_exp = fnc_key_expand(jj_key_base, true)
+				if	jj_ext_mode
+				then	tbl_ext_jj.SEQ = { [jj_key_base] = { KXP = tbl_key_exp, [jj_ext_mode] = { } } }
+				else	tbl_ext_jj.SEQ = { [jj_key_base] = { KXP = tbl_key_exp, } }
 				end
 				if	jj_ext_mode
 				and	ALLOW_SEQ_IN_EXT
@@ -663,7 +685,11 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		or	tbl_ext.DBL
 		or	tbl_ext.HLD
 		then	-- the last part of key sequence:
-			tbl_ext_jj.scripts = { [id_ext] = obj_mcr }
+			tbl_ext_jj.SCR = { obj_mcr, [ii_key] = { obj_mcr } }
+			if not	obj_mcr.key_seq_all
+			then	obj_mcr.key_seq_all = { }
+			end
+			obj_mcr.key_seq_all[#obj_mcr.key_seq_all + 1] = { str = ii_key, tbl = tbl_key_ii }
 			if not	obj_mcr.id
 			or	obj_mcr.id == "<no id>"
 			-- have to have id, i.e. reloading or detecting
