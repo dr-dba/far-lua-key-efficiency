@@ -1,6 +1,5 @@
 --[[
 if true then return end --]]
-
 local Info = Info or package.loaded.regscript or function(...) return ... end -- luacheck: ignore 113/Info
 local nfo = Info {
 	_filename or ...,
@@ -38,6 +37,7 @@ for ii, ii_key in ipairs({
 	"CtrlAltF1:Hold",
 	"RCtrlRAltF2:Hold",
 	"LCtrlLAltF2:Hold",
+	"CtrlAltF2:Hold",
 	"ShiftF1:Hold",
 	"^:Hold",
 	"::Double",
@@ -61,7 +61,7 @@ for ii, ii_key in ipairs({
 })
 do	Macro { description = "Example MacroEx: "..ii_key,
 		id = win.Uuid(win.Uuid()),
-		area = "Editor",
+		area = "Editor Shell",
 		key = ii_key,
 		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
 	}
