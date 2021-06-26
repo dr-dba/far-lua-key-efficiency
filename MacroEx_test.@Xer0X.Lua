@@ -56,6 +56,8 @@ for ii, ii_key in ipairs({
 	"LCtrlLAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
 	"x-y-z",
 	"CtrlS:Double-F3-F2-F1",
+	--[[ extension modes which are AFTER the first key,
+	is not suported currently, but the expeption is not thrown:]]
 	"CtrlS:Hold-F3-F2:Double-F1",
 	"CtrlF8-Alt"
 })
