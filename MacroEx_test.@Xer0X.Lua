@@ -1,5 +1,6 @@
 --[[
 if true then return end --]]
+
 local Info = Info or package.loaded.regscript or function(...) return ... end -- luacheck: ignore 113/Info
 local nfo = Info {
 	_filename or ...,
@@ -8,7 +9,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.6",
+	version_mod	= "0.6.7",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -42,6 +43,7 @@ for ii, ii_key in ipairs({
 	"RCtrl<minus>-<minus>-<minus>-<minus>",
 					-- RCtrl-,then -, then -, then -
 	"RCtrl-<minus>-<minus>-<minus>",-- RCtrl, then -, then -, then -
+	"RCtrlQ-RCtrlA-RCtrl-",		-- here final "-" is treated conventional way
 	"ShiftF8-F8",
 	"CtrlF8-F9",
 	"CtrlK-J",
