@@ -1,6 +1,5 @@
 --[[
 if true then return end --]]
-
 local Info = Info or package.loaded.regscript or function(...) return ... end -- luacheck: ignore 113/Info
 local nfo = Info {
 	_filename or ...,
@@ -9,7 +8,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.2",
+	version_mod	= "0.6.3",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -46,18 +45,20 @@ for ii, ii_key in ipairs({
 --	"qwerty-0",
 	"CtrlAltS:Hold",
 	"CtrlAltS:Double",
-	"CtrlAltS-CtrlAltF-CtrlAltA",
+	"RCtrlRAltS:Double",
+	"LCtrlLAltS-RCtrlRAltO-CtrlAltX",
 	"CtrlAlt-CtrlAlt",
-	"x-y-z",
-	"CtrlAlt-Alt",
-	"CtrlAlt-Alt",
-	"CtrlS:Double-F3-F2-F1",
-	"CtrlS:Hold-F3-F2:Double-F1",
+	"CtrlAlt-CtrlAlt-F8",
 	"CtrlAlt:Hold",
 	"CtrlAlt:Hold-F3-F2-F1",
-	"CtrlAlt-CtrlAlt-F8",
+	"CtrlAlt:Double",
+	"CtrlAlt-Alt",
+	"CtrlAlt-Alt",
 	"CtrlAlt-F7-F6-F5",
 	"LCtrlLAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
+	"x-y-z",
+	"CtrlS:Double-F3-F2-F1",
+	"CtrlS:Hold-F3-F2:Double-F1",
 	"CtrlF8-Alt"
 })
 do	Macro { description = "Example MacroEx: "..ii_key,
@@ -89,20 +90,12 @@ do	Macro {	description = ii_key.." (Common) MacroEx example",
 	}
 end
 
-Macro {	description = "CtrlF9-AltF9 (Viewer) MacroEx example",
+Macro {	description = "CtrlF9-AltF9 (Viewer+Editor) MacroEx example",
 	id = win.Uuid(win.Uuid()),
-	area = "Viewer",
+	area = "Viewer Editor",
 	key = "CtrlF9-AltF9",
 	priority = 100,
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description) end
-}
-
-Macro {	description = "CtrlF9-AltF9 (Editor) MacroEx example",
-	id = win.Uuid(win.Uuid()),
-	area = "Editor",
-	key = "CtrlF9-AltF9",
-	priority = 100,
-	action = function(mcr_src) far.Message("You pressed "..string.format("%s; %s / %s", AKey, mf.akey(1, 0), mf.akey(1, 1)), mcr_src.description) end
 }
 
 -- @@@@@
