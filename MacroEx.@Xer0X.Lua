@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.9",
+	version_mod	= "1.5.10",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -635,7 +635,18 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		local tbl_ext_jj = tbl_ext
 		local jj_key_base, jj_ext_mode, ii_has_ext
 		for jj_key_seq in str_gmatch(ii_key.."-", "([^-]*)-")
-		do	-- try to save load time:
+		do	if	jj_key_seq == ""
+			then	if	#tbl_key_ii == 0
+				then	--[[ this phenomena happened to me on "-",
+					this is plain key, so just skip it]]
+					goto keys_loop_end
+				else	--[[ this phenomena happens onto such plain keys, 
+					as "Alt-" for example, should be on finalizing key ]]
+					tbl_key_ii[#tbl_key_ii] = tbl_key_ii[#tbl_key_ii].."-"
+					goto seq_keys_loop_end
+				end				
+			end
+			-- try to save load time:
 			if not	ii_has_ext
 			and (	#tbl_key_ii > 0
 			or	str_match(jj_key_seq, ":double")
@@ -643,6 +654,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	ii_has_ext = true
 			end
 			tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<minus>", "-")
+			::seq_keys_loop_end::
 		end
 		if not	ii_has_ext
 		then	goto keys_loop_end
