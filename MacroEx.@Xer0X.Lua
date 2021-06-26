@@ -289,12 +289,12 @@ local function fnc_key_expand(key_base, in_lower, str_id, as_received)
 	alt2 = alt or RLalt
 	key = plain or ""
 	local tbl_key = { ctl = ctl2, alt = alt2, sft = shift, key = key }
-	tbl_key.vis = str_lower(str_format(KEY_VIS_FMT,
+	tbl_key.vis	= str_lower(str_format(KEY_VIS_FMT,
 		ctl2 or 0,
 		alt2 or 0,
 		shift and 1 or 0,
 		plain or "<NONE>"))
-	tbl_key.str = str_lower(str_format(KEY_STR_FMT,
+	tbl_key.str	= str_lower(str_format(KEY_STR_FMT,
 		ctl2 and ctl2..CTL or "",
 		alt2 and alt2..ALT or "",
 		shift or "", key))
@@ -407,7 +407,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	and	obj_ext.SEQ
 	then	has_seq = obj_ext.SEQ
 		next_key = ""
-	else	has_seq = obj_handler.key_ext.SEQ 
+	else	has_seq = obj_handler.key_ext.SEQ -- [area] or obj_handler.SEQ.common
 	end
 	if	has_seq
 	then
@@ -453,7 +453,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				from the starting input, what want we do? ]]
 				if	key2 == ""
 				or	key2 == nil
-				-- looks like key state prefix was changed
+				-- Looks like key state prefix was changed
 				then	if	BREAK_SEQ_ON_MOD_RELEASE
 					-- on changing CtlAlt modifiers consider it as breaking sequence:
 					then	run_normal = true
@@ -635,7 +635,7 @@ end -- fnc_macro_ex_create
 
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
-	local tbl_exp = { }
+	local tbl_handlers_loc = { }
 	local id_ext = obj_mcr.id ~= "<no id>" and obj_mcr.id or str_upper(win_uuid(win_uuid()))
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s+", true))
 	do	local obj_mcr_ii = { [ii_key] = { obj_mcr } }
@@ -643,11 +643,13 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		local tbl_ext = { }
 		local tbl_ext_jj = tbl_ext
 		local jj_key_base, jj_ext_mode
-		if str_match(ii_key, "^%-") then ii_key = str_gsub(ii_key, "^%-", "<MINUS>") end
-		if str_match(ii_key, "%-$") then ii_key = str_gsub(ii_key, "%-$", "<MINUS>") end
-		if str_match(ii_key, "%-%-")then ii_key = str_gsub(ii_key, "%-%-","<MINUS>-")end
+		if str_match(ii_key, "^%-")	then ii_key = str_gsub(ii_key, "^%-"	, "<minus>")	end
+		if str_match(ii_key, "%-$")	then ii_key = str_gsub(ii_key, "%-$"	, "<minus>")	end
+		if str_match(ii_key, "%-%-%-%-")then ii_key = str_gsub(ii_key, "%-%-%-%-","<minus>-<minus>-")end
+		if str_match(ii_key, "%-%-%-")	then ii_key = str_gsub(ii_key, "%-%-%-"	, "-<minus>-")	end
+		if str_match(ii_key, "%-%-")	then ii_key = str_gsub(ii_key, "%-%-"	, "<minus>-")	end
 		for	jj_key_seq in	str_gmatch(ii_key.."-", "([^-]*)-")
-		do	tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<MINUS>", "-")
+		do	tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<minus>", "-")
 		end
 		for	jj, jj_key_seq in pairs(tbl_key_ii)
 		do
@@ -692,8 +694,8 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	tbl_ext_jj = tbl_seq_stub or ALLOW_SEQ_IN_EXT and tbl_ext_stub.SEQ
 			end
 		end
-		if	#tbl_key_ii > 1		
-		or({next(tbl_ext_jj)})[2].EXT	
+		if	#tbl_key_ii > 1		-- has sequence
+		or({next(tbl_ext_jj)})[2].EXT	-- probably is not sequence, but has extension
 		then
 			if	#tbl_key_ii > 1
 			then	if not	obj_mcr.key_seq_all
@@ -709,16 +711,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	obj_mcr.id = id_ext
 			end
 			for kk, kk_area in pairs(fnc_str_split(str_lower(obj_mcr.area), "%s+", true))
-			do	for ll_ext_key, ll_ext_obj in pairs(tbl_ext)
-				do tbl_exp[ll_ext_key] = fnc_key_handler_set(kk_area, ll_ext_obj, obj_mcr)
+			do	if not	tbl_handlers_loc[kk_area]
+				then	tbl_handlers_loc[kk_area] = { }
+				end
+				for ll_ext_key, ll_ext_obj in pairs(tbl_ext)
+				do	tbl_handlers_loc[kk_area][ll_ext_key] = fnc_key_handler_set(kk_area, ll_ext_obj, obj_mcr)
 				end
 			end
 		end
 	end
 	if	create_handlers
-	then	fnc_macro_ex_create(tbl_exp)
+	then	fnc_macro_ex_create(tbl_handlers_loc)
 	end
-	return tbl_exp
+	return tbl_handlers_loc
 end -- fnc_macro_ex_check_one
 
 local function fnc_macro_ex_build_all()
