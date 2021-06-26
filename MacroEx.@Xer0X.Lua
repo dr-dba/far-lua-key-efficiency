@@ -68,12 +68,12 @@ local EVAL_MACRONOTFOUND = -2
 local EVAL_MACROCANCELED = -3
 local EVAL_RUNTIMEERROR  = -4
 local EVAL_RES = {
-	 [EVAL_SUCCESS]		= "EVAL_SUCCESS"	
-	,[EVAL_SYNTAXERROR]	= "EVAL_SYNTAXERROR"	
-	,[EVAL_BADARGS]		= "EVAL_BADARGS"	
-	,[EVAL_MACRONOTFOUND]	= "EVAL_MACRONOTFOUND"	
-	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"	
-	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR"	
+	 [EVAL_SUCCESS]		= "EVAL_SUCCESS"	--  0
+	,[EVAL_SYNTAXERROR]	= "EVAL_SYNTAXERROR"	-- 11
+	,[EVAL_BADARGS]		= "EVAL_BADARGS"	-- -1
+	,[EVAL_MACRONOTFOUND]	= "EVAL_MACRONOTFOUND"	-- -2 макрос не найден среди загруженных макросов
+	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"	-- -3 было выведено меню выбора макроса, и пользователь его отменил
+	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR"	-- -4 макрос был прерван в результате ошибки времени исполнения
 }
 local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
 local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
@@ -357,10 +357,9 @@ local obj_waitkeys = {
 }
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local base_inp	= obj_handler.base_inp
 	local mod_state = obj_handler.mod_state
 	local m_key	= obj_handler.m_key
-	local base_vkc	= base_inp.VirtualKeyCode
+	local base_vkc	= obj_handler.base_inp.VirtualKeyCode
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
@@ -372,9 +371,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- ?? inheritance (AutoCompletion, Search)
 	local next_key = "" -- have to be not null
 	local t_wait_key = t_key_ex_start
-	local flag_ext = obj_handler.key_ext.EXT
 --	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
-	if	flag_ext
+	if	obj_handler.key_ext.EXT -- just a flag for the extended mode existence here
 	then	repeat
 			is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod = fnc_is_released(mod_state)
 			if is_rls_mod	then break end
@@ -386,8 +384,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		was_hld = is_timeout and fnc_is_holding(base_vkc)
 		was_dbl = fnc_key_equal(next_key, a_key_real)
 		str_ext =
-			was_hld and obj_handler.key_ext.HLD and "HLD" or 
-			was_dbl and obj_handler.key_ext.DBL and "DBL"	
+			was_hld and obj_handler.key_ext.HLD and "HLD" or-- [area] or obj_handler.HLD.common
+			was_dbl and obj_handler.key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
 		obj_ext = str_ext and obj_handler.key_ext[str_ext]
 		if	obj_ext
 		and	obj_ext.SCR
@@ -685,7 +683,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				tbl_ext_jj[kk_str].ALL = obj_mcr_ii
 				if	jj_ext_mode
 				then	tbl_ext_jj[kk_str][jj_ext_mode] = tbl_ext_stub
-					tbl_ext_jj[kk_str].EXT = jj_ext_mode
+					tbl_ext_jj[kk_str].EXT = true
 				elseif	jj == #tbl_key_ii
 				then	tbl_ext_jj[kk_str].SCR = obj_mcr_ii
 				end
