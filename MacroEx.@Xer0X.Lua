@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.8",
+	version_mod	= "1.5.9",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -267,7 +267,8 @@ local function fnc_key_expand(key_base, in_lower, str_id, as_received)
 	local R =	in_lower and "r"	or "R"
 	local L	=	in_lower and "l"	or "L"
 	local ALT =	in_lower and "alt"	or "Alt"
-	local CTL =	in_lower and "ctrl"	or "ctrl"
+	local CTL =	in_lower and "ctrl"	or "Ctrl"
+	local NONE=	in_lower and "<none>"	or "<NONE>"
 	local RLctl, RLalt, shift, plain = rgx_key_parse:match(str_lower(key_base))
 	local tbl_exp = { }
 	local ctl, alt, sft, ctl2, alt2, key
@@ -283,23 +284,23 @@ local function fnc_key_expand(key_base, in_lower, str_id, as_received)
 		ctl2 or 0,
 		alt2 or 0,
 		shift and 1 or 0,
-		plain or "<NONE>"))
-	tbl_key.str	= str_lower(str_format(KEY_STR_FMT,
+		plain or NONE))
+	tbl_key.str	= str_format(KEY_STR_FMT,
 		ctl2 and ctl2..CTL or "",
 		alt2 and alt2..ALT or "",
-		shift or "", key))
-	tbl_key.rec	= str_lower(str_format(KEY_STR_FMT,
+		shift or "", key)
+	tbl_key.rec	= str_format(KEY_STR_FMT,
 		ctl2 and (ctl2 == R and R or "")..CTL or "",
 		alt2 and (alt2 == R and R or "")..ALT or "",
-		shift or "", key))
-	tbl_key.rec_cas = str_lower(str_format(KEY_STR_FMT,
+		shift or "", key)
+	tbl_key.rec_cas = str_format(KEY_STR_FMT,
 		ctl2 and (ctl2 == R and R or "")..CTL or "",
 		alt2 and (alt2 == R and R or "")..ALT or "",
-		shift or "", ""))
-	tbl_key.cas	= str_lower(str_format(KEY_CAS_FMT,
+		shift or "", "")
+	tbl_key.cas	= str_format(KEY_CAS_FMT,
 		ctl2 and ctl2..CTL or "",
 		alt2 and alt2..ALT or "",
-		shift or ""))
+		shift or "")
 	tbl_exp[str_id and tbl_key.str or tbl_key.vis] = tbl_key
 	alt = str_lower(alt or "") == L and not as_received and R 
 	until not alt
