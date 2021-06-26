@@ -28,6 +28,13 @@ Macro { description = "test",
 }
 
 for ii, ii_key in ipairs({
+	"LCtrl--x",	-- LCtrl-,then X
+	"LCtrl--",	-- LCtrl, then -
+	"LCtrl---",	-- LCtrl-,then -
+	"RCtrl---F2",	-- RCtrl, then -, then F2
+	"RCtrl----F1",	-- RCtrl-,then -, then F1,
+	"RCtrl--<minus>-<minus>-<minus>",
+	"RCtrl-<minus>-<minus>-<minus>",
 	"ShiftF8-F8",
 	"CtrlF8-F9",
 	"CtrlK-J",
@@ -57,7 +64,7 @@ for ii, ii_key in ipairs({
 	"x-y-z",
 	"CtrlS:Double-F3-F2-F1",
 	--[[ extension modes which are AFTER the first key,
-	is not suported currently, but the expeption is not thrown:]]
+	is not suported currently, so this will not work:]]
 	"CtrlS:Hold-F3-F2:Double-F1",
 	"CtrlF8-Alt"
 })
