@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.4",
+	version_mod	= "1.5.8",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -110,6 +110,7 @@ local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
 local fnc_tbl_count	= Xer0X.fnc_tbl_count
 local fnc_case_title 	= Xer0X.fnc_case_title
 local fnc_case_toggle	= Xer0X.fnc_case_toggle
+local fnc_key_prettify	= Xer0X.fnc_key_prettify
 
 local str_lower = utf8.Utf8_lower	or utf8.lower
 local str_upper = utf8.Utf8_upper	or utf8.upper
@@ -251,17 +252,6 @@ local function fnc_combo_mod_try(key)
 		end
 	end
 end -- fnc_combo_mod_try
-
-local function fnc_key_prettify(str_key)
-	return str_key
-		:gsub("shift",	"Shift"	)
-		:gsub("rctrl",	"RCtrl"	)
-		:gsub("lctrl",	"LCtrl"	)
-		:gsub("ctrl",	"Ctrl"	)
-		:gsub("ralt",	"RAlt"	)
-		:gsub("lalt",	"LAlt"	)
-		:gsub("alt",	"Alt"	)
-end -- fnc_key_prettify
 
 --[[ have to be base key, as in "CtrlRAltA" is "A":
 local rgx_key_parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
@@ -642,14 +632,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		local tbl_key_ii = { }
 		local tbl_ext = { }
 		local tbl_ext_jj = tbl_ext
-		local jj_key_base, jj_ext_mode
-		if str_match(ii_key, "^%-")	then ii_key = str_gsub(ii_key, "^%-"	, "<minus>")	end
-		if str_match(ii_key, "%-$")	then ii_key = str_gsub(ii_key, "%-$"	, "<minus>")	end
-		if str_match(ii_key, "%-%-%-%-")then ii_key = str_gsub(ii_key, "%-%-%-%-","<minus>-<minus>-")end
-		if str_match(ii_key, "%-%-%-")	then ii_key = str_gsub(ii_key, "%-%-%-"	, "-<minus>-")	end
-		if str_match(ii_key, "%-%-")	then ii_key = str_gsub(ii_key, "%-%-"	, "<minus>-")	end
-		for	jj_key_seq in	str_gmatch(ii_key.."-", "([^-]*)-")
-		do	tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<minus>", "-")
+		local jj_key_base, jj_ext_mode, ii_has_ext
+		for jj_key_seq in str_gmatch(ii_key.."-", "([^-]*)-")
+		do	-- try to save load time:
+			if not	ii_has_ext
+			and (	#tbl_key_ii > 0
+			or	str_match(jj_key_seq, ":double")
+			or	str_match(jj_key_seq, ":hold"))
+			then	ii_has_ext = true
+			end
+			tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<minus>", "-")
+		end
+		if not	ii_has_ext
+		then	goto keys_loop_end
 		end
 		for	jj, jj_key_seq in pairs(tbl_key_ii)
 		do
@@ -694,10 +689,8 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	tbl_ext_jj = tbl_seq_stub or ALLOW_SEQ_IN_EXT and tbl_ext_stub.SEQ
 			end
 		end
-		if	#tbl_key_ii > 1		-- has sequence
-		or({next(tbl_ext_jj)})[2].EXT	-- probably is not sequence, but has extension
-		then
-			if	#tbl_key_ii > 1
+		if	ii_has_ext              -- prebuild analized
+		then	if	#tbl_key_ii > 1
 			then	if not	obj_mcr.key_seq_all
 				then	obj_mcr.key_seq_all = { [ii_key] = tbl_key_ii }
 				elseif
@@ -719,6 +712,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				end
 			end
 		end
+		::keys_loop_end::
 	end
 	if	create_handlers
 	then	fnc_macro_ex_create(tbl_handlers_loc)
@@ -727,6 +721,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 end -- fnc_macro_ex_check_one
 
 local function fnc_macro_ex_build_all()
+	local t1 = Far.UpTime
 	for ii = 1, #Xer0X.utils.LoadedMacros
 	do	local	ii_mcr = Xer0X.utils.LoadedMacros[ii]
 		if	ii_mcr.key
