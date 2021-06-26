@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.4.1",
+	version_mod	= "1.5.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -64,16 +64,16 @@ local C = far.Colors
 local EVAL_SUCCESS       =  0
 local EVAL_SYNTAXERROR   = 11
 local EVAL_BADARGS       = -1
-local EVAL_MACRONOTFOUND = -2  
-local EVAL_MACROCANCELED = -3  
-local EVAL_RUNTIMEERROR  = -4  
+local EVAL_MACRONOTFOUND = -2
+local EVAL_MACROCANCELED = -3
+local EVAL_RUNTIMEERROR  = -4
 local EVAL_RES = {
-	 [EVAL_SUCCESS]		= "EVAL_SUCCESS"
-	,[EVAL_SYNTAXERROR]	= "EVAL_SYNTAXERROR"
-	,[EVAL_BADARGS]		= "EVAL_BADARGS"
-	,[EVAL_MACRONOTFOUND]	= "EVAL_MACRONOTFOUND"
-	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"
-	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR" 
+	 [EVAL_SUCCESS]		= "EVAL_SUCCESS"	
+	,[EVAL_SYNTAXERROR]	= "EVAL_SYNTAXERROR"	
+	,[EVAL_BADARGS]		= "EVAL_BADARGS"	
+	,[EVAL_MACRONOTFOUND]	= "EVAL_MACRONOTFOUND"	
+	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"	
+	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR"	
 }
 local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
 local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
@@ -87,7 +87,8 @@ local MOD_MASK = bor(
 	RIGHT_CTRL_PRESSED,
 	SHIFT_PRESSED
 		)
-local	tbl_ext_mode_code = { double = "DBL", hold = "HLD" }
+local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
+local	tbl_ext_mode_show = { DBL = ":Double",	HLD = ":Hold"}
 local	Xer0X = require("Lib-Common-@Xer0X")
 local	req_ok, req_msg, fnc_lua_exp	= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
 if not	req_ok
@@ -363,7 +364,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
 	obj_waitkeys:init()
-	local has_dbl, has_hld, was_hld, was_dbl, ext_hld, ext_dbl, is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod, is_timeout, run_normal, anassigned_msg
+	local was_hld, was_dbl, obj_ext, str_ext, is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod, is_timeout, run_normal, anassigned_msg
 	local a_key_real = mf_akey(1, 0)
 	local a_key_show = mf_akey(1, 1)
 	local t_key_ex_start = Far.UpTime
@@ -371,12 +372,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	-- ?? inheritance (AutoCompletion, Search)
 	local next_key = "" -- have to be not null
 	local t_wait_key = t_key_ex_start
-	local has_ext = obj_handler.key_ext.EXT
+	local flag_ext = obj_handler.key_ext.EXT
 --	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
-	if	has_ext
-	then	has_dbl = obj_handler.key_ext.DBL 
-		has_hld = obj_handler.key_ext.HLD 
-		repeat
+	if	flag_ext
+	then	repeat
 			is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod = fnc_is_released(mod_state)
 			if is_rls_mod	then break end
 			next_key, t_wait_key = obj_waitkeys:save(10)
@@ -386,45 +385,36 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		until false
 		was_hld = is_timeout and fnc_is_holding(base_vkc)
 		was_dbl = fnc_key_equal(next_key, a_key_real)
-		ext_hld = was_hld and has_hld
-		ext_dbl = was_dbl and has_dbl
-		if	ext_hld
-		and	has_hld.SCR
-		then    local eval_ok, eval_res = runMacro(a_key_real, ":Hold")
-			obj_status:set(a_key_real..":Hold "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
-			return
-		end
-		if	ext_dbl
-		and	has_dbl.SCR
-		then	local eval_ok, eval_res = runMacro(a_key_real, ":Double")
-			obj_status:set(a_key_real..":Double "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
+		str_ext =
+			was_hld and obj_handler.key_ext.HLD and "HLD" or 
+			was_dbl and obj_handler.key_ext.DBL and "DBL"	
+		obj_ext = str_ext and obj_handler.key_ext[str_ext]
+		if	obj_ext
+		and	obj_ext.SCR
+		then    local	eval_ok, eval_res = runMacro(a_key_real, tbl_ext_mode_show[str_ext])
+			if not	eval_ok
+			and	eval_res == -2
+			then	-- just take the first macro object:
+				local scr_key, scr_mcr = next(obj_ext.SCR)
+				eval_res = eval(scr_key, 2)
+				eval_ok = eval_res ~= EVAL_MACRONOTFOUND
+			end
+			obj_status:set(a_key_real..tbl_ext_mode_show[str_ext].." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
 			return
 		end
 	end
 	local	has_seq
 	if	ALLOW_SEQ_IN_EXT
-	and	ext_hld
-	and	ext_hld.SEQ
-	then	has_seq = ext_hld.SEQ
+	and	obj_ext
+	and	obj_ext.SEQ
+	then	has_seq = obj_ext.SEQ
 		next_key = ""
-	end
-	if	ALLOW_SEQ_IN_EXT
-	and not	has_seq
-	and	ext_dbl
-	and	ext_dbl.SEQ
-	then	has_seq = ext_dbl.SEQ
-		next_key = ""
-	end
-	if not	has_seq
-	then	has_seq = obj_handler.key_ext.SEQ 
+	else	has_seq = obj_handler.key_ext.SEQ 
 	end
 	if	has_seq
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
-		a_key_show = a_key_show..(
-			ext_hld and ":Hold"	or
-			ext_dbl and ":Double"	or
-			"")
+		a_key_show = a_key_show..(str_ext and tbl_ext_mode_show[str_ext] or "")
 		local obj_scr = far.SaveScreen()
 		local end_key_fmt =
 			--[[ to require ending key with modifiers:
