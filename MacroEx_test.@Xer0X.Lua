@@ -8,7 +8,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.3",
+	version_mod	= "0.6.4",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -28,12 +28,10 @@ Macro { description = "test",
 }
 
 for ii, ii_key in ipairs({
-	"CtrlF9:Hold",
-	"CtrlF9:Double",
 	"ShiftF8-F8",
 	"CtrlF8-F9",
 	"CtrlK-J",
-	"AltF1:Hold",
+	"RAltF1:Hold",
 	"CtrlAltF1:Hold",
 	"RCtrlRAltF2:Hold",
 	"LCtrlLAltF2:Hold",
@@ -70,7 +68,6 @@ do	Macro { description = "Example MacroEx: "..ii_key,
 end
 
 local test_mcr_key = "CtrlF9"
-
 for ii, ii_key in ipairs({
 	test_mcr_key..":Double",
 	test_mcr_key..":Hold",
