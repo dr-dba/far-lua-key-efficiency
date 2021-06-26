@@ -1,6 +1,11 @@
 --[[
 if true then return end --]]
 
+--[[
+PARTIALLY (PROBABLY?) DEPENDS ON:
+XKeys — скрипт для замены одноимённого плагина
+https://forum.farmanager.com/viewtopic.php?t=8481#p116428
+]]
 local Info = Info or package.loaded.regscript or function(...) return ... end -- luacheck: ignore 113/Info
 local nfo = Info {
 	_filename or ...,
@@ -9,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.7",
+	version_mod	= "0.6.8",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -63,14 +68,14 @@ for ii, ii_key in ipairs({
 	"LCtrlLAltS-RCtrlRAltO-CtrlAltX",
 	"LCtrlAlt-RCtrlAlt",
 	"CtrlRAlt-LCtrlRAlt-F8",
-	"CtrlAlt:Hold",
+	"CtrlLAlt:Hold",
 	"CtrlRAlt:Hold-F3-F2-F1",
 	"RCtrlRAlt:Double",
 	"RCtrlAlt-Alt",
 	"LCtrlRAlt-Alt",
 	"LCtrlRAlt-F7-F6-F5",
 	"LCtrlLAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
-	"x-y-z",
+	"X-Y-Z",
 	"CtrlS:Double-F3-F2-F1",
 	--[[ extension modes which are AFTER the first key,
 	is not suported currently, so this will not work:]]
