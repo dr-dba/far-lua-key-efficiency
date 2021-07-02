@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.17",
+	version_mod	= "1.5.18",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -126,7 +126,6 @@ local math_max	= math.max
 local tbl_concat= table.concat
 local tbl_insert= table.insert
 local mf_waitkey= mf.waitkey
-local mf_akey	= mf.akey
 local win_uuid	= win.Uuid
 
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
@@ -268,53 +267,63 @@ local function runMacroOrKey(key)
 end
 
 --[[ have to be base key, as in "CtrlRAltA" is "A":
-local rgx_key_parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
+local rgx_key_parse = regex.new( "^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
 --[=[! have NOT to be base key, as in "CtrlRAltA" is NiL:]]
-local rgx_key_parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
+local rgx_key_parse = regex.new("/^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$/i")
 --[[ todo:
-local rgx_key_parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
+local rgx_key_parse = regex.new( "^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
 return rgx_key_parse:match(("LCtrlRAlt"):lower())
 --]]
 
-local function fnc_key_expand(key_base, in_lower, str_id, as_received)
+local function fnc_key_parse(the_key)
+	local RLctl, RLalt, shift, plain = rgx_key_parse:match(the_key)
+	return {
+		RLctl = RLctl,
+		RLalt = RLalt,
+		shift = shift,
+		plain = plain,
+	}
+end
+
+local function fnc_key_expand(the_key, in_lower, str_id, as_received)
 --	assert(key:match("^%l+$"))
 	local R =	in_lower and "r"	or "R"
 	local L	=	in_lower and "l"	or "L"
 	local ALT =	in_lower and "alt"	or "Alt"
 	local CTL =	in_lower and "ctrl"	or "Ctrl"
 	local NONE=	in_lower and "<none>"	or "<NONE>"
-	local RLctl, RLalt, shift, plain = rgx_key_parse:match(str_lower(key_base))
+	local obj_key = fnc_key_parse(str_lower(the_key))
 	local tbl_exp = { }
 	local ctl, alt, sft, ctl2, alt2, key
-	ctl = RLctl == "" and L -- (in_lower and "l" or "L")
+	ctl = obj_key.RLctl == "" and L -- (in_lower and "l" or "L")
 	repeat
-	alt = RLalt == "" and L -- (in_lower and "l" or "L")
+	alt = obj_key.RLalt == "" and L -- (in_lower and "l" or "L")
 	repeat
-	ctl2 = ctl or RLctl
-	alt2 = alt or RLalt
-	key = plain or ""
-	local tbl_key = { ctl = ctl2, alt = alt2, sft = shift, key = key }
+	ctl2 = ctl or obj_key.RLctl
+	alt2 = alt or obj_key.RLalt
+	key = obj_key.plain or ""
+	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key }
 	tbl_key.vis	= str_lower(str_format(KEY_VIS_FMT,
 		ctl2 or 0,
 		alt2 or 0,
-		shift and 1 or 0,
-		plain or NONE))
+		obj_key.shift and 1 or 0,
+		obj_key.plain or NONE))
 	tbl_key.str	= str_format(KEY_STR_FMT,
 		ctl2 and ctl2..CTL or "",
 		alt2 and alt2..ALT or "",
-		shift or "", key)
+		obj_key.shift or "", key)
 	tbl_key.rec	= str_format(KEY_STR_FMT,
 		ctl2 and (ctl2 == R and R or "")..CTL or "",
 		alt2 and (alt2 == R and R or "")..ALT or "",
-		shift or "", key)
+		obj_key.shift or "", key)
 	tbl_key.rec_cas = str_format(KEY_STR_FMT,
 		ctl2 and (ctl2 == R and R or "")..CTL or "",
 		alt2 and (alt2 == R and R or "")..ALT or "",
-		shift or "", "")
+		obj_key.shift or "", "")
 	tbl_key.cas	= str_format(KEY_CAS_FMT,
 		ctl2 and ctl2..CTL or "",
 		alt2 and alt2..ALT or "",
-		shift or "")
+		obj_key.shift or "")
 	tbl_exp[str_id and tbl_key.str or tbl_key.vis] = tbl_key
 	alt = str_lower(alt or "") == L and not as_received and R 
 	until not alt
@@ -365,39 +374,36 @@ local obj_waitkeys = {
 }
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local key_ext_pre, was_hld, was_dbl, str_ext, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
-	local trig_key_real = mf_akey(1, 0) 
-	local trig_key_show = mf_akey(1, 1)
+	local key_ext_pre, key_rec_pre, key_rec_new, was_hld, was_dbl, str_ext, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
+	local trig_key_real = akey(1, 0) 
+	local trig_key_show = akey(1, 1)
 	local key_ext =	obj_handler.key_ext
 	local key_rec =	far_NameToInputRecord(trig_key_real)
 	local cas_int =	band(key_rec.ControlKeyState, MOD_MASK) 
 	local inp_vkc =	key_rec.VirtualKeyCode
-	-- prevent autorepeat:
-	fnc_eat_autorep(inp_vkc)
+	fnc_eat_autorep(inp_vkc) -- prevent autorepeat
 	local sz_seq_chain = str_gsub(trig_key_show, "-", "Minus")
 	obj_waitkeys:init(trig_key_real)
-	local t_key_ex_start = Far.UpTime
+	local t_last_key = Far.UpTime
+	local t_wait_key = t_last_key -- cant be empty
 	local area = str_lower(Area.Current)
-	-- ?? inheritance (AutoCompletion, Search)
-	local next_key = "" -- have to be not null
-	local t_wait_key = t_key_ex_start
---	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
+	local key_str_new = "" -- have to be not null
 	if	key_ext.EXT -- just a flag for the extended mode existence here
 	then	repeat
 			if fnc_is_cas_mod_rls(cas_int) then break end
-			next_key, t_wait_key = obj_waitkeys:save(10)
-			if next_key~="" then break end
-			is_timeout = t_wait_key - t_key_ex_start > OPT_DELAY
+			key_str_new, t_wait_key = obj_waitkeys:save(50)
+			if key_str_new ~="" then break end
+			is_timeout = t_wait_key - t_last_key > OPT_DELAY
 			if is_timeout	then break end
 		until false
 		was_hld = is_timeout and fnc_is_holding(inp_vkc)
-		was_dbl = fnc_key_equal(next_key, trig_key_real)
+		was_dbl = fnc_key_equal(key_str_new, trig_key_real)
 		str_ext =
 			was_hld and key_ext.HLD and "HLD" or	-- [area] or obj_handler.HLD.common
 			was_dbl and key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
 		if	str_ext
-		then	key_ext_pre = key_ext
-			key_ext = key_ext[str_ext]
+		then	key_ext_pre =	key_ext
+			key_ext	=	key_ext[str_ext]
 			sz_seq_chain	= sz_seq_chain	..tbl_ext_mode_show[str_ext]
 			trig_key_show	= trig_key_show	..tbl_ext_mode_show[str_ext]
 			if	key_ext.SCR
@@ -412,34 +418,27 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				obj_status:set(trig_key_show.." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
 				return
 			end
-			next_key = ""
+			key_str_new = ""
 		end
 	end
 	if	key_ext.SEQ -- [area] or obj_handler.SEQ.common
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
 		local obj_scr = far.SaveScreen()
-		local end_key_fmt =
-			--[[ to require ending key with modifiers:
-			("^%s(.+)") --]]
-			("^%s(.*)") 
-			:format(key_ext.KXP and key_ext.KXP.rec_cas or key_ext_pre.KXP.rec_cas)
-			-- note: DBL/HLD do not has KXP, so take it from previous
-		local t_last_key = t_wait_key
 		repeat
 			if	fnc_is_cas_mod_rls(cas_int)
 			and	BREAK_SEQ_ON_MOD_RELEASE
 			then	run_normal = true
 				break
 			end
-			if	next_key == ""
-			then	--	try_seq_wait = true -- ? @Xer0X
+			if	key_str_new == ""
+			then
 				is_timeout = t_wait_key - t_last_key > OPT_DELAY_SEQ
 				if	is_timeout
-				then    seq_hlp_msg = fnc_get_seq_hlp(a_key_show)
+				then    seq_hlp_msg = fnc_get_seq_hlp(trig_key_show)
 					if	seq_hlp_msg
 					then	obj_status:stop()
-						far.Message(seq_hlp_msg, a_key_show, "", "l")
+						far.Message(seq_hlp_msg, trig_key_show, "", "l")
 					else	run_normal = true
 						anassigned_msg = str_format("%s No scripts assigned", sz_seq_chain or "")
 						break
@@ -448,50 +447,41 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				end
 			else	-- got the next key
 				t_last_key = t_wait_key
-				local	key2_run -- :that will be the key to launch
-				-- extract new received (next) key without modifiers:
-				local	key2 = str_match(str_lower(next_key), end_key_fmt)
-				--[[ control state of received key is different
-				from the starting input, what want we do? ]]
-				if not	key2
-				or	key2 == ""
-				-- Looks like key state prefix was changed
-				then	if	BREAK_SEQ_ON_MOD_RELEASE
-					-- on changing CtlAlt modifiers consider it as breaking sequence:
+				key_rec_new = far_NameToInputRecord(key_str_new)
+				local	key_str_run = key_str_new
+				local	key_str_try
+				if	band(key_rec_new.ControlKeyState, MOD_MASK)
+				==	band(key_rec	.ControlKeyState, MOD_MASK)
+				then	key_str_try = fnc_key_parse(key_str_new).plain
+				else	if	BREAK_SEQ_ON_MOD_RELEASE
 					then	run_normal = true
 						break
-					--[[ release of control (ctl+alt) keys allowed,
-					so we just take it as a whole:]]
-					else	key2_run = next_key
 					end
-				--[[ contol state in sequence key was not changed,
-				thus we run the read (received) key as it is:]]
-				else	key2_run = key2
 				end
-				::seq_key2_test::
-				local	key2_run_exp = fnc_key_expand(key2_run, "in_lower", "real_key_str", "received")
-				local	str_key2_seq,
-					obj_key2_seq = fnc_key_equal( key2_run_exp, key_ext.SEQ)
-				if not	str_key2_seq
+				::seq_key_test::
+				local	key_exp_run = fnc_key_expand(key_str_run, "in_lower", "real_key_str", "received")
+				local	key_str_seq,
+					key_obj_seq = fnc_key_equal( key_exp_run, key_ext.SEQ)
+				if not	key_str_seq
 				and not BREAK_SEQ_ON_MOD_RELEASE
-				and	key2_run~= next_key
-				then	key2_run = next_key
-					goto seq_key2_test
+				and	key_str_try
+				and	key_str_try ~= key_str_run
+				then	key_str_run  = key_str_try
+					goto seq_key_test
 				end
-				if	str_key2_seq -- ? is it registered sequence key
-				then	key_ext_pre = key_ext
-					key_ext = obj_key2_seq
-					sz_seq_chain = sz_seq_chain.."-"..str_gsub(key2_run, "-", "Minus")
-					obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 1000)	
+				if	key_str_seq -- ? is it registered sequence key
+				then
+					key_ext_pre = key_ext
+					key_rec_pre = key_rec
+					key_rec = key_rec_new
+					key_ext	= key_obj_seq
+					sz_seq_chain = sz_seq_chain.."-"..str_gsub(key_str_run, "-", "Minus")
+					obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 1000)
 					if 	key_ext.SCR
-					--[[ the registered sequence is finalized here:
-						fnc_tbl_count(obj_key2_seq.SCR) > 0
-					.. so run it:]]
 					then	local	eval_ok, eval_res = runMacro(sz_seq_chain)
 						if not	eval_ok
 						and	eval_res == -2
-						then	-- just take the first macro object:
-							local scr_key, scr_mcr = next(key_ext.SCR)
+						then	local scr_key, scr_mcr = next(key_ext.SCR)
 							eval_res = eval(scr_key, 2)
 							eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 						end
@@ -501,29 +491,14 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					end
 					if not(	key_ext.SEQ
 					or	key_ext.EXT)
-					then return
+					then	return
 					end
-				else	--[[ the received key is not registered,
-					thus the sequence is broken,
-					run all previous keys as "normal" and exit:]]
+				else	
 					run_normal = true
 					break
 				end
-				--[[ an alternative way to define want we state breaking:
-				local key2_run = key2 ~= "" and key2 or next_key
-				--! false == BREAK_SEQ_ON_MOD_RELEASE
-				if	runMacro(a_key_show, "-"..key2_fix)
-				then	return
-				elseif	key2_fix ~= next_key
-				and	runMacro(a_key_show, "-"..next_key)
-				then	return
-				else	-- set timeout var to prevent key post..
-					is_timeout = true
-					run_normal = true
-				end
-				break --]]
 			end
-			next_key, t_wait_key = obj_waitkeys:save(10)
+			key_str_new, t_wait_key = obj_waitkeys:save(10)
 		until false
 		if obj_scr then far.RestoreScreen(obj_scr) end
 	end -- "if has_seq"
@@ -535,13 +510,13 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 		end
 		--[[ the old fashion, no multi-sequences:
-		if next_key ~= ""
-		then runMacroOrKey(next_key)
+		if key_str_new ~= ""
+		then runMacroOrKey(key_str_new)
 		end --]]
 		is_locked = false
 		obj_status:set(anassigned_msg or str_format(
-			"%s anassigned, run_norm: %s, timeout: %s, next_key: %s",
-			trig_key_real, tostring(run_normal), tostring(is_timeout), tostring(next_key)
+			"%s anassigned, run_norm: %s, timeout: %s, key_str_new: %s",
+			trig_key_real, tostring(run_normal), tostring(is_timeout), tostring(key_str_new)
 				), nil, 3000)
 		return
 	end
