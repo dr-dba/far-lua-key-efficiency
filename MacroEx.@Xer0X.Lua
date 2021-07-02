@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.10",
+	version_mod	= "1.5.14",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -153,6 +153,32 @@ local function fnc_err_msg(msg, ...)
 	until	false
 end -- fnc_err_msg
 
+local rgx_combo = regex.new("^((?:[rl]?ctrl)?(?:[rl]?alt)?(?:shift)?)((?:shift)|(?:alt))$", "i")
+local function fnc_combo_mod_try(key)
+	local	combo_mod,
+		combo_key = rgx_combo:match(key)
+	if	combo_mod
+	then	local	m = far.NameToInputRecord(combo_mod.."a")
+		local	k = far.NameToInputRecord(combo_key)
+		if	m
+		and	k
+		then	return {ControlKeyState	= m.ControlKeyState,
+				VirtualKeyCode	= k.VirtualKeyCode}
+		end
+	end
+end -- fnc_combo_mod_try
+
+local far_NameToInputRecord = function(the_key)
+	--[[ FarNameToInputRecord: "CtrlNumLock"-->VK_PAUSE
+	http://bugs.farmanager.com/view.php?id=2947
+	http://forum.farmanager.com/viewtopic.php?f=8&t=9357
+	РљРѕРјР±РёРЅР°С†РёСЏ РєР»Р°РІРёС€ CtrlNumLock РґР»СЏ СЃРёСЃС‚РµРјС‹ РѕР·РЅР°С‡Р°РµС‚ VK_PAUSE, РЅРѕ С„Р°СЂ РѕР± СЌС‚РѕРј РЅРµ Р·РЅР°РµС‚.]]
+	return str_match(the_key, "r?ctrlnumlock")
+		and	far.NameToInputRecord(	"Pause")
+		or	far.NameToInputRecord(	the_key)
+		or	fnc_combo_mod_try(	the_key)
+end
+
 local function fnc_eat_autorep(vkc) no_repeat = vkc end
 
 local function fnc_is_holding(vkc) return no_repeat == vkc end
@@ -175,12 +201,9 @@ Event {	description = "MacroEx helper",
 }
 
 -- State after last mf.waitkey!!
-local function fnc_is_released(mod_state)
-	local mod_last = Mouse.LastCtrlState
-	return  band(mod_last, mod_state) == 0,
-		band(mod_last, mod_state),
-		mod_last,
-		Mouse.CtrlState
+local function fnc_is_cas_mod_rls(cas_int_curr)
+	local	cas_int_last = Mouse.LastCtrlState
+	return	band(cas_int_last, cas_int_curr) == 0
 end
 
 local tbl_key_hlp_cache = { }
@@ -206,11 +229,11 @@ local function fnc_get_seq_hlp(seq_key)
 			then
 				-- ?? checkFlags, CheckFileName
 				if (	ii_mcr_area_low == "common"
-				or	string.find(ii_mcr_area_low, area_re)
+				or	str_find(ii_mcr_area_low, area_re)
 						)
 				and not ii_mcr.disabled
 				and (	ii_mcr.condition == nil
-				or	type(ii_mcr.condition) == "function"
+				or type(ii_mcr.condition) == "function"
 				and	ii_mcr.condition(seq_key)
 				or	ii_mcr.condition
 						)
@@ -225,8 +248,8 @@ local function fnc_get_seq_hlp(seq_key)
 	return txt_help
 end -- fnc_get_seq_hlp
 
-local function runMacro(key, Ex)
-	local	eval_res = eval(key..Ex, 2)
+local function runMacro(key, ext)
+	local	eval_res = eval(key..(ext and ext or ""), 2)
 	return	eval_res ~= EVAL_MACRONOTFOUND, eval_res
 end
 
@@ -237,21 +260,6 @@ local function runMacroOrKey(key)
 	end
 	return	eval_res
 end
-
-local rgx_combo = regex.new("^((?:[rl]?ctrl)?(?:[rl]?alt)?(?:shift)?)((?:shift)|(?:alt))$", "i")
-local function fnc_combo_mod_try(key)
-	local	combo_mod,
-		combo_key = rgx_combo:match(key)
-	if	combo_mod
-	then	local	m = far.NameToInputRecord(combo_mod.."a")
-		local	k = far.NameToInputRecord(combo_key)
-		if	m
-		and	k
-		then	return {ControlKeyState	= m.ControlKeyState,
-				VirtualKeyCode	= k.VirtualKeyCode}
-		end
-	end
-end -- fnc_combo_mod_try
 
 --[[ have to be base key, as in "CtrlRAltA" is "A":
 local rgx_key_parse = regex.new("^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
@@ -331,8 +339,11 @@ end -- fnc_hnd_mcr_condition
 
 local obj_waitkeys = {
 	keys = { },
-	init = function(self)
-		self.keys = { }
+	init = function(self, keys)
+		local type_keys = type(keys)
+		self.keys= type_keys == "nil"	and { }
+			or type_keys == "table"	and keys
+			or { keys } 
 		self.no_key = nil
 	end,
 	save = function(self, ...)
@@ -348,25 +359,25 @@ local obj_waitkeys = {
 }
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local mod_state = obj_handler.mod_state
-	local m_key	= obj_handler.m_key
+	local key_ext_pre, was_hld, was_dbl, str_ext, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
+	local key_ext	= obj_handler.key_ext
+	local cas_int	= obj_handler.cas_int 
 	local base_vkc	= obj_handler.base_inp.VirtualKeyCode
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
-	obj_waitkeys:init()
-	local was_hld, was_dbl, obj_ext, str_ext, is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod, is_timeout, run_normal, anassigned_msg
-	local a_key_real = mf_akey(1, 0)
+	local a_key_real = mf_akey(1, 0) 
 	local a_key_show = mf_akey(1, 1)
+	local sz_seq_chain = str_gsub(a_key_show, "-", "Minus")
+	obj_waitkeys:init(a_key_real)
 	local t_key_ex_start = Far.UpTime
 	local area = str_lower(Area.Current)
 	-- ?? inheritance (AutoCompletion, Search)
 	local next_key = "" -- have to be not null
 	local t_wait_key = t_key_ex_start
 --	local is_mod  = k.mod[area] or k.mod.common -- todo extramod
-	if	obj_handler.key_ext.EXT -- just a flag for the extended mode existence here
+	if	key_ext.EXT -- just a flag for the extended mode existence here
 	then	repeat
-			is_rls_mod, res_rls_mod, new_rls_mod, cur_rls_mod = fnc_is_released(mod_state)
-			if is_rls_mod	then break end
+			if fnc_is_cas_mod_rls(cas_int) then break end
 			next_key, t_wait_key = obj_waitkeys:save(10)
 			if next_key~="" then break end
 			is_timeout = t_wait_key - t_key_ex_start > OPT_DELAY
@@ -375,75 +386,68 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		was_hld = is_timeout and fnc_is_holding(base_vkc)
 		was_dbl = fnc_key_equal(next_key, a_key_real)
 		str_ext =
-			was_hld and obj_handler.key_ext.HLD and "HLD" or-- [area] or obj_handler.HLD.common
-			was_dbl and obj_handler.key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
-		obj_ext = str_ext and obj_handler.key_ext[str_ext]
-		if	obj_ext
-		and	obj_ext.SCR
-		then    local	eval_ok, eval_res = runMacro(a_key_real, tbl_ext_mode_show[str_ext])
-			if not	eval_ok
-			and	eval_res == -2
-			then	-- just take the first macro object:
-				local scr_key, scr_mcr = next(obj_ext.SCR)
-				eval_res = eval(scr_key, 2)
-				eval_ok = eval_res ~= EVAL_MACRONOTFOUND
+			was_hld and key_ext.HLD and "HLD" or	-- [area] or obj_handler.HLD.common
+			was_dbl and key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
+		if	str_ext
+		then	key_ext_pre = key_ext
+			key_ext = key_ext[str_ext]
+			sz_seq_chain	= sz_seq_chain	..tbl_ext_mode_show[str_ext]
+			a_key_show	= a_key_show	..tbl_ext_mode_show[str_ext]
+			if	key_ext.SCR
+			then    local	eval_ok, eval_res = runMacro(a_key_real, tbl_ext_mode_show[str_ext])
+				if not	eval_ok
+				and	eval_res == -2
+				then	-- just take the first macro object:
+					local scr_key, scr_mcr = next(key_ext.SCR)
+					eval_res = eval(scr_key, 2)
+					eval_ok = eval_res ~= EVAL_MACRONOTFOUND
+				end
+				obj_status:set(a_key_real..tbl_ext_mode_show[str_ext].." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
+				return
 			end
-			obj_status:set(a_key_real..tbl_ext_mode_show[str_ext].." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
-			return
+			next_key = ""
 		end
 	end
-	local	has_seq
-	if	ALLOW_SEQ_IN_EXT
-	and	obj_ext
-	and	obj_ext.SEQ
-	then	has_seq = obj_ext.SEQ
-		next_key = ""
-	else	has_seq = obj_handler.key_ext.SEQ -- [area] or obj_handler.SEQ.common
-	end
-	if	has_seq
+	if	key_ext.SEQ -- [area] or obj_handler.SEQ.common
 	then
 		-- ctrlaltshiftkey ==> CtrlAltShiftKey # todo (match) # DONE? @Xer0X
-		a_key_show = a_key_show..(str_ext and tbl_ext_mode_show[str_ext] or "")
 		local obj_scr = far.SaveScreen()
 		local end_key_fmt =
 			--[[ to require ending key with modifiers:
 			("^%s(.+)") --]]
 			("^%s(.*)") 
-			:format(obj_handler.key_ext.KXP.rec_cas)
-		local sz_seq_chain, seq_hlp_msg
+			:format(key_ext.KXP and key_ext.KXP.rec_cas or key_ext_pre.KXP.rec_cas)
+			-- note: DBL/HLD do not has KXP, so take it from previous
 		local t_last_key = t_wait_key
-		local ii_key_seq = has_seq
 		repeat
-			obj_status:set(a_key_show..(sz_seq_chain or "").."-..?", nil, 1000)
-			is_rls_mod = fnc_is_released(mod_state)
-			if	is_rls_mod
+			if	fnc_is_cas_mod_rls(cas_int)
 			and	BREAK_SEQ_ON_MOD_RELEASE
 			then	run_normal = true
 				break
 			end
 			if	next_key == ""
 			then	--	try_seq_wait = true -- ? @Xer0X
-				if t_wait_key - t_last_key > OPT_DELAY_SEQ
-				then
-					is_timeout = true
-					seq_hlp_msg = fnc_get_seq_hlp(a_key_show)
+				is_timeout = t_wait_key - t_last_key > OPT_DELAY_SEQ
+				if	is_timeout
+				then    seq_hlp_msg = fnc_get_seq_hlp(a_key_show)
 					if	seq_hlp_msg
 					then	obj_status:stop()
 						far.Message(seq_hlp_msg, a_key_show, "", "l")
 					else	run_normal = true
-						anassigned_msg = str_format("%s%s No scripts assigned", a_key_show, sz_seq_chain or "")
+						anassigned_msg = str_format("%s No scripts assigned", sz_seq_chain or "")
 						break
 					end
+				else	obj_status:set(sz_seq_chain.."-..?", nil, 1000)
 				end
 			else	-- got the next key
 				t_last_key = t_wait_key
 				local	key2_run -- :that will be the key to launch
 				-- extract new received (next) key without modifiers:
-				local	key2 = str_match(next_key, end_key_fmt)
+				local	key2 = str_match(str_lower(next_key), end_key_fmt)
 				--[[ control state of received key is different
 				from the starting input, what want we do? ]]
-				if	key2 == ""
-				or	key2 == nil
+				if not	key2
+				or	key2 == ""
 				-- Looks like key state prefix was changed
 				then	if	BREAK_SEQ_ON_MOD_RELEASE
 					-- on changing CtlAlt modifiers consider it as breaking sequence:
@@ -457,45 +461,40 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				thus we run the read (received) key as it is:]]
 				else	key2_run = key2
 				end
+				::seq_key2_test::
 				local	key2_run_exp = fnc_key_expand(key2_run, "in_lower", "real_key_str", "received")
-				local	next_key_exp, key2_run_seq
-				local	str_next_seq,
-					obj_key2_seq = fnc_key_equal(key2_run_exp, ii_key_seq)
-				if	obj_key2_seq
-				then	key2_run_seq = true
-				elseif	next_key ~= key2_run
+				local	str_key2_seq,
+					obj_key2_seq = fnc_key_equal( key2_run_exp, key_ext.SEQ)
+				if not	str_key2_seq
 				and not BREAK_SEQ_ON_MOD_RELEASE
-				then 
-					next_key_exp = fnc_key_expand(next_key, "in_lower", "real_key_str", "received")
-					str_next_seq,
-					obj_key2_seq = fnc_key_equal(next_key_exp, ii_key_seq)
+				and	key2_run~= next_key
+				then	key2_run = next_key
+					goto seq_key2_test
 				end
-				if	obj_key2_seq -- ? is it registered sequence key
-				then	sz_seq_chain = (sz_seq_chain or "").."-"..(key2_run_seq and key2_run or next_key)
-					obj_status:set(str_format("%s%s Run ?", a_key_show, sz_seq_chain), nil, 1000000)
-					if 	obj_key2_seq.SCR
+				if	str_key2_seq -- ? is it registered sequence key
+				then	key_ext_pre = key_ext
+					key_ext = obj_key2_seq
+					sz_seq_chain = sz_seq_chain.."-"..str_gsub(key2_run, "-", "Minus")
+					obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 1000)	
+					if 	key_ext.SCR
 					--[[ the registered sequence is finalized here:
 						fnc_tbl_count(obj_key2_seq.SCR) > 0
 					.. so run it:]]
-					then	local	eval_ok, eval_res = runMacro(a_key_show, sz_seq_chain)
+					then	local	eval_ok, eval_res = runMacro(sz_seq_chain)
 						if not	eval_ok
 						and	eval_res == -2
 						then	-- just take the first macro object:
-							local scr_key, scr_mcr = next(obj_key2_seq.SCR)
+							local scr_key, scr_mcr = next(key_ext.SCR)
 							eval_res = eval(scr_key, 2)
 							eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 						end
 						far.RestoreScreen(obj_scr); obj_scr = nil
-						obj_status:set(str_format("%s%s Run %s/%s", a_key_show, sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
+						obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
 						return
 					end
-					--[[ have we any continue for the sequence?
-					BTW, here we may go to DBL/HLD paths]]
-					ii_key_seq = obj_key2_seq.SEQ
-					if not	ii_key_seq
-					then	-- all done, no further sequences
-						return
-					else	-- continue to the next sequenced key
+					if not(	key_ext.SEQ
+					or	key_ext.EXT)
+					then return
 					end
 				else	--[[ the received key is not registered,
 					thus the sequence is broken,
@@ -525,9 +524,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	or	run_normal
 	then
 		is_locked = true
-		local run_res = runMacroOrKey(a_key_real)
 		for ii = 1, #obj_waitkeys.keys
-		do      run_res = runMacroOrKey(obj_waitkeys.keys[ii])
+		do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 		end
 		--[[ the old fashion, no multi-sequences:
 		if next_key ~= ""
@@ -564,36 +562,27 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	end
 end
 
--- register hotkey's handler
+-- register hotkey's handler, here keys and areas should be already normalized to lower case
 local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
-	local m_key = obj_key_ext.KXP.str
-	local base_inp =
-		far.NameToInputRecord(obj_key_ext.KXP.rec)
-		or fnc_combo_mod_try(obj_key_ext.KXP.rec)
-	if not	base_inp
-	then    if OPT_DEBUG
-		then fnc_err_msg(("Unexpected AKey: %q"):format(m_key))
-		end
-		return
-	end
-	--[[ FarNameToInputRecord: "CtrlNumLock"-->VK_PAUSE
-	http://bugs.farmanager.com/view.php?id=2947
-	http://forum.farmanager.com/viewtopic.php?f=8&t=9357
-	Комбинация клавиш CtrlNumLock для системы означает VK_PAUSE, но фар об этом не знает.]]
-	if str_match(str_lower(m_key), "r?ctrlnumlock")
-	then	base_inp = far.NameToInputRecord("Pause")
-	end
 	if not	tbl_handlers[key_area]
 	then	tbl_handlers[key_area] = { }
 	end
+	local	m_key = obj_key_ext.KXP.str
 	local	obj_handler = tbl_handlers[key_area][m_key]
 	if not	obj_handler
-	then	obj_handler = {
+	then
+		local	base_inp = far_NameToInputRecord(obj_key_ext.KXP.rec)
+		if not	base_inp
+		then    if OPT_DEBUG
+			then fnc_err_msg(str_format("Unexpected AKey: %q", m_key))
+			end
+			return
+		end
+		obj_handler = {
 			description	= ("MacroEx handler for %s %q"):format(str_upper(key_area), fnc_key_prettify(m_key)),
 			key_area	= key_area,
-			m_key		= m_key,
 			base_inp	= base_inp,
-			mod_state	= band(base_inp.ControlKeyState, MOD_MASK),
+			cas_int		= band(base_inp.ControlKeyState, MOD_MASK),
 			key_ext		= { },
 			fnc_condition	= function(rec_key, mcr_src)
 				return fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
@@ -627,11 +616,10 @@ end -- fnc_macro_ex_create
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_handlers_loc = { }
-	local id_ext = obj_mcr.id ~= "<no id>" and obj_mcr.id or str_upper(win_uuid(win_uuid()))
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s+", true))
 	do	local obj_mcr_ii = { [ii_key] = { obj_mcr } }
 		local tbl_key_ii = { }
-		local tbl_ext = { }
+		local tbl_ext	 = { }
 		local tbl_ext_jj = tbl_ext
 		local jj_key_base, jj_ext_mode, ii_has_ext
 		for jj_key_seq in str_gmatch(ii_key.."-", "([^-]*)-")
@@ -640,20 +628,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				then	--[[ this phenomena happened to me on "-",
 					this is plain key, so just skip it]]
 					goto keys_loop_end
-				else	--[[ this phenomena happens onto such plain keys, 
+				else	--[[ this phenomena happens onto such plain keys,
 					as "Alt-" for example, should be on finalizing key ]]
 					tbl_key_ii[#tbl_key_ii] = tbl_key_ii[#tbl_key_ii].."-"
 					goto seq_keys_loop_end
-				end				
+				end
 			end
 			-- try to save load time:
 			if not	ii_has_ext
 			and (	#tbl_key_ii > 0
-			or	str_match(jj_key_seq, ":double")
-			or	str_match(jj_key_seq, ":hold"))
+			or	str_find( jj_key_seq, "%S[:-]%S"))
 			then	ii_has_ext = true
 			end
-			tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "<minus>", "-")
+			tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "minus", "-")
 			::seq_keys_loop_end::
 		end
 		if not	ii_has_ext
@@ -665,15 +652,10 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			if	jj_ext_mode
 			then	-- here ext_mode supposed to be HLD or DBL
 				jj_ext_mode = tbl_ext_mode_code[jj_ext_mode]
-				if not	jj_ext_mode
-				then	jj_key_base = nil
-				end
-			end
-			if not	jj_key_base
-			then	jj_key_base = jj_key_seq
+			else	jj_key_base = jj_key_seq
 			end
 			local tbl_key_exp_jj = fnc_key_expand(jj_key_base, true, true)
-			local tbl_ext_stub = jj_ext_mode and { ALL = obj_mcr_ii } or nil
+			local tbl_ext_stub = jj_ext_mode and { ALL = obj_mcr_ii, EXT = jj_ext_mode } or nil
 			local tbl_seq_stub = jj < #tbl_key_ii and { } or nil
 			if	jj == #tbl_key_ii
 			then	if	jj_ext_mode
@@ -701,20 +683,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			if	jj < #tbl_key_ii
 			then	tbl_ext_jj = tbl_seq_stub or ALLOW_SEQ_IN_EXT and tbl_ext_stub.SEQ
 			end
-		end
+		end -- end of the sequence keys processing loop
 		if	ii_has_ext              -- prebuild analized
 		then	if	#tbl_key_ii > 1
-			then	if not	obj_mcr.key_seq_all
-				then	obj_mcr.key_seq_all = { [ii_key] = tbl_key_ii }
+			then	if not	obj_mcr.data.key_seq_all
+				then	obj_mcr.data.key_seq_all = { [ii_key] = tbl_key_ii }
 				elseif
-				not	obj_mcr.key_seq_all[ii_key]
-				then	obj_mcr.key_seq_all[ii_key] = tbl_key_ii
+				not	obj_mcr.data.key_seq_all[ii_key]
+				then	obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii
 				end
 			end
-			if not	obj_mcr.id
-			or	obj_mcr.id == "<no id>"
-			-- have to have id, i.e. reloading or detecting
-			then	obj_mcr.id = id_ext
+			if not	obj_mcr.data.id_ext
+			-- have to have id, for reloading or detecting
+			then	obj_mcr.data.id_ext = obj_mcr.id ~= "<no id>" and obj_mcr.id or str_upper(win_uuid(win_uuid()))
 			end
 			for kk, kk_area in pairs(fnc_str_split(str_lower(obj_mcr.area), "%s+", true))
 			do	if not	tbl_handlers_loc[kk_area]
@@ -733,12 +714,33 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	return tbl_handlers_loc
 end -- fnc_macro_ex_check_one
 
+local function fnc_mcr_cond_find(obj_ext)
+	local tbl_res = { }
+	for ii_key_base, ii_obj_base in pairs(obj_ext.ALL and { [obj_ext.KXP and obj_ext.KXP.str or obj_ext.EXT] = { ALL = obj_ext.ALL } } or obj_ext)
+	do	for jj_key_full, jj_mcr_coll in pairs(ii_obj_base.ALL)
+		do	for kk_num, kk_mcr_obj in pairs(jj_mcr_coll)
+			do	if not	tbl_res[kk_mcr_obj.data.id_ext]
+				then	tbl_res[kk_mcr_obj.data.id_ext] = {
+						key_full = jj_key_full,
+						key_trig = ii_key_base,
+						mcr = kk_mcr_obj,
+						pri = kk_mcr_obj.priority
+					}
+				end
+			end
+		end
+	end
+	return tbl_res
+end
+
 local function fnc_macro_ex_build_all()
 	local t1 = Far.UpTime
 	for ii = 1, #Xer0X.utils.LoadedMacros
 	do	local	ii_mcr = Xer0X.utils.LoadedMacros[ii]
-		if	ii_mcr.key
+		local	ii_mcr_key = ii_mcr.key
+		if	ii_mcr_key
 		and not ii_mcr.keyregex
+		and	str_find(ii_mcr_key, "%S[:-]%S") -- %S(s) - any (non-)whitespace character
 		then	fnc_macro_ex_check_one(ii_mcr)
 		end
 	end
