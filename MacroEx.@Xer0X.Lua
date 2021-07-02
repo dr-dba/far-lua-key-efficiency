@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.15",
+	version_mod	= "1.5.16",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -366,14 +366,14 @@ local obj_waitkeys = {
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext_pre, was_hld, was_dbl, str_ext, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
+	local trig_key_real = mf_akey(1, 0) 
+	local trig_key_show = mf_akey(1, 1)
 	local key_ext =	obj_handler.key_ext
-	local key_rec =	obj_handler.key_rec
+	local key_rec =	far_NameToInputRecord(trig_key_real)
 	local cas_int =	band(key_rec.ControlKeyState, MOD_MASK) 
 	local inp_vkc =	key_rec.VirtualKeyCode
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
-	local trig_key_real = mf_akey(1, 0) 
-	local trig_key_show = mf_akey(1, 1)
 	local sz_seq_chain = str_gsub(trig_key_show, "-", "Minus")
 	obj_waitkeys:init(trig_key_real)
 	local t_key_ex_start = Far.UpTime
@@ -580,7 +580,6 @@ local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
 	then	obj_handler = {
 			description	= ("MacroEx handler for %s %q"):format(str_upper(key_area), fnc_key_prettify(m_key)),
 			key_area	= key_area,
-			key_rec		= far_NameToInputRecord(obj_key_ext.KXP.rec),
 			key_ext		= { },
 			fnc_condition	= function(rec_key, mcr_src)
 				return fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
