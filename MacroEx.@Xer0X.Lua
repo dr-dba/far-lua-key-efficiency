@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.14",
+	version_mod	= "1.5.15",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -173,10 +173,16 @@ local far_NameToInputRecord = function(the_key)
 	http://bugs.farmanager.com/view.php?id=2947
 	http://forum.farmanager.com/viewtopic.php?f=8&t=9357
 	РљРѕРјР±РёРЅР°С†РёСЏ РєР»Р°РІРёС€ CtrlNumLock РґР»СЏ СЃРёСЃС‚РµРјС‹ РѕР·РЅР°С‡Р°РµС‚ VK_PAUSE, РЅРѕ С„Р°СЂ РѕР± СЌС‚РѕРј РЅРµ Р·РЅР°РµС‚.]]
-	return str_match(the_key, "r?ctrlnumlock")
-		and	far.NameToInputRecord(	"Pause")
-		or	far.NameToInputRecord(	the_key)
-		or	fnc_combo_mod_try(	the_key)
+	local	key_inp_rec = str_match(the_key, "r?ctrlnumlock")
+			and	far.NameToInputRecord(	"Pause")
+			or	far.NameToInputRecord(	the_key)
+			or	fnc_combo_mod_try(	the_key)
+	if not	key_inp_rec
+	then    if OPT_DEBUG
+		then fnc_err_msg(str_format("Unexpected AKey: %q", obj_key_ext.KXP.rec))
+		end
+	end
+	return key_inp_rec
 end
 
 local function fnc_eat_autorep(vkc) no_repeat = vkc end
@@ -360,15 +366,16 @@ local obj_waitkeys = {
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext_pre, was_hld, was_dbl, str_ext, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
-	local key_ext	= obj_handler.key_ext
-	local cas_int	= obj_handler.cas_int 
-	local base_vkc	= obj_handler.base_inp.VirtualKeyCode
+	local key_ext =	obj_handler.key_ext
+	local key_rec =	obj_handler.key_rec
+	local cas_int =	band(key_rec.ControlKeyState, MOD_MASK) 
+	local inp_vkc =	key_rec.VirtualKeyCode
 	-- prevent autorepeat:
 	fnc_eat_autorep(base_vkc)
-	local a_key_real = mf_akey(1, 0) 
-	local a_key_show = mf_akey(1, 1)
-	local sz_seq_chain = str_gsub(a_key_show, "-", "Minus")
-	obj_waitkeys:init(a_key_real)
+	local trig_key_real = mf_akey(1, 0) 
+	local trig_key_show = mf_akey(1, 1)
+	local sz_seq_chain = str_gsub(trig_key_show, "-", "Minus")
+	obj_waitkeys:init(trig_key_real)
 	local t_key_ex_start = Far.UpTime
 	local area = str_lower(Area.Current)
 	-- ?? inheritance (AutoCompletion, Search)
@@ -384,7 +391,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			if is_timeout	then break end
 		until false
 		was_hld = is_timeout and fnc_is_holding(base_vkc)
-		was_dbl = fnc_key_equal(next_key, a_key_real)
+		was_dbl = fnc_key_equal(next_key, trig_key_real)
 		str_ext =
 			was_hld and key_ext.HLD and "HLD" or	-- [area] or obj_handler.HLD.common
 			was_dbl and key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
@@ -392,9 +399,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then	key_ext_pre = key_ext
 			key_ext = key_ext[str_ext]
 			sz_seq_chain	= sz_seq_chain	..tbl_ext_mode_show[str_ext]
-			a_key_show	= a_key_show	..tbl_ext_mode_show[str_ext]
+			trig_key_show	= trig_key_show	..tbl_ext_mode_show[str_ext]
 			if	key_ext.SCR
-			then    local	eval_ok, eval_res = runMacro(a_key_real, tbl_ext_mode_show[str_ext])
+			then    local	eval_ok, eval_res = runMacro(trig_key_show)
 				if not	eval_ok
 				and	eval_res == -2
 				then	-- just take the first macro object:
@@ -402,7 +409,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					eval_res = eval(scr_key, 2)
 					eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 				end
-				obj_status:set(a_key_real..tbl_ext_mode_show[str_ext].." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
+				obj_status:set(trig_key_show.." "..eval_res.."/"..EVAL_RES[eval_res], nil, 1000)
 				return
 			end
 			next_key = ""
@@ -534,12 +541,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		is_locked = false
 		obj_status:set(anassigned_msg or str_format(
 			"%s anassigned, run_norm: %s, timeout: %s, next_key: %s",
-			a_key_real, tostring(run_normal), tostring(is_timeout), tostring(next_key)
+			trig_key_real, tostring(run_normal), tostring(is_timeout), tostring(next_key)
 				), nil, 3000)
 		return
 	end
 	-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
-	obj_status:set(anassigned_msg or a_key_real.." is anassigned", nil, 3000)
+	obj_status:set(anassigned_msg or trig_key_real.." is anassigned", nil, 3000)
 	mf.beep()
 	--[[ needed?
 	win.Sleep(100) --]]
@@ -570,19 +577,10 @@ local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
 	local	m_key = obj_key_ext.KXP.str
 	local	obj_handler = tbl_handlers[key_area][m_key]
 	if not	obj_handler
-	then
-		local	base_inp = far_NameToInputRecord(obj_key_ext.KXP.rec)
-		if not	base_inp
-		then    if OPT_DEBUG
-			then fnc_err_msg(str_format("Unexpected AKey: %q", m_key))
-			end
-			return
-		end
-		obj_handler = {
+	then	obj_handler = {
 			description	= ("MacroEx handler for %s %q"):format(str_upper(key_area), fnc_key_prettify(m_key)),
 			key_area	= key_area,
-			base_inp	= base_inp,
-			cas_int		= band(base_inp.ControlKeyState, MOD_MASK),
+			key_rec		= far_NameToInputRecord(obj_key_ext.KXP.rec),
 			key_ext		= { },
 			fnc_condition	= function(rec_key, mcr_src)
 				return fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
