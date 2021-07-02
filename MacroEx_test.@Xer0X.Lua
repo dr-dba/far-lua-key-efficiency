@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.8",
+	version_mod	= "0.6.11",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -30,25 +30,23 @@ Macro { description = "test",
 	area = "Editor",
 	key = "CtrlF9",
 --	priority = 100,
-	action = function() far.Message("plain macro") end
+	action = function() far.Message("plain macro", mf.akey(1, 0).." / "..mf.akey(1, 1)) end
 }
 
 for ii, ii_key in ipairs({
 --	"LCtrl--x",			-- LCtrl-,then X
-	"LCtrl<MINUS>-X",		-- LCtrl-,then X
---	"LCtrl--",			-- LCtrl, then -
-	"LCtrl-<MINUS>",		-- LCtrl, then -
+	"LCtrlMinus-X",			-- LCtrl-,then X
 --	"LCtrl---",			-- LCtrl-,then -
-	"LCtrl<MINUS>-<MINUS>",		-- LCtrl-,then -
+	"LCtrlMinus-Minus",		-- LCtrl-,then -
+--	"LCtrl--",			-- LCtrl, then -
+	"LCtrl-Minus",			-- LCtrl, then -
 --	"RCtrl---F2",			-- RCtrl, then -, then F2
-	"RCtrl-<MINUS>-F2",		-- RCtrl, then -, then F2
+	"RCtrl-Minus-F2",		-- RCtrl, then -, then F2
 --	"RCtrl----F1",			-- RCtrl-,then -, then F1
-	"RCtrl<MINUS>-<MINUS>-F1",	-- RCtrl-,then -, then F1
---	"RCtrl--<minus>-<minus>-<minus>",
-	"RCtrl<minus>-<minus>-<minus>-<minus>",
-					-- RCtrl-,then -, then -, then -
-	"RCtrl-<minus>-<minus>-<minus>",-- RCtrl, then -, then -, then -
-	"RCtrlQ-RCtrlA-RCtrl-",		-- here final "-" is treated conventional way
+	"RCtrlMinus-Minus-F1",		-- RCtrl-,then -, then F1
+	"RCtrlMinus-Minus-Minus-Minus", -- RCtrl-,then -, then -, then -
+	"RCtrl-minus-minus-minus",	-- RCtrl, then -, then -, then -
+	"RCtrlQ-RCtrlA-RCtrl-",		-- here final "-" is treated the conventional way
 	"ShiftF8-F8",
 	"CtrlF8-F9",
 	"CtrlK-J",
