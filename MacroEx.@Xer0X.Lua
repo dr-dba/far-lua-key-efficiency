@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.16",
+	version_mod	= "1.5.17",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -373,7 +373,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local cas_int =	band(key_rec.ControlKeyState, MOD_MASK) 
 	local inp_vkc =	key_rec.VirtualKeyCode
 	-- prevent autorepeat:
-	fnc_eat_autorep(base_vkc)
+	fnc_eat_autorep(inp_vkc)
 	local sz_seq_chain = str_gsub(trig_key_show, "-", "Minus")
 	obj_waitkeys:init(trig_key_real)
 	local t_key_ex_start = Far.UpTime
@@ -390,7 +390,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			is_timeout = t_wait_key - t_key_ex_start > OPT_DELAY
 			if is_timeout	then break end
 		until false
-		was_hld = is_timeout and fnc_is_holding(base_vkc)
+		was_hld = is_timeout and fnc_is_holding(inp_vkc)
 		was_dbl = fnc_key_equal(next_key, trig_key_real)
 		str_ext =
 			was_hld and key_ext.HLD and "HLD" or	-- [area] or obj_handler.HLD.common
