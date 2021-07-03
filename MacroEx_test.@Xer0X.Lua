@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.6.11",
+	version_mod	= "0.6.12",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -28,9 +28,9 @@ if not nfo then return end
 Macro { description = "test",
 	id = win.Uuid(win.Uuid()),
 	area = "Editor",
-	key = "CtrlF9",
+	key = "LCtrlF9 RCtrlF9",
 --	priority = 100,
-	action = function() far.Message("plain macro", mf.akey(1, 0).." / "..mf.akey(1, 1)) end
+	action = function() far.Message("plain macro", akey(1, 0).." / "..akey(1, 1)) end
 }
 
 for ii, ii_key in ipairs({
@@ -52,9 +52,9 @@ for ii, ii_key in ipairs({
 	"CtrlK-J",
 	"RAltF1:Hold",
 	"CtrlAltF1:Hold",
+	"CtrlAltF2:Hold",
 	"RCtrlRAltF2:Hold",
 	"LCtrlLAltF2:Hold",
-	"CtrlAltF2:Hold",
 	"ShiftF1:Hold",
 	"^:Hold",
 	"::Double",
@@ -75,9 +75,8 @@ for ii, ii_key in ipairs({
 	"LCtrlLAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
 	"X-Y-Z",
 	"CtrlS:Double-F3-F2-F1",
-	--[[ extension modes which are AFTER the first key,
-	is not suported currently, so this will not work:]]
 	"CtrlS:Hold-F3-F2:Double-F1",
+	"CtrlS:Hold-F3-F2:Hold-F1",
 	"CtrlF8-Alt"
 })
 do	Macro { description = "Example MacroEx: "..ii_key,
