@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.6.2",
+	version_mod	= "1.6.2.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -238,7 +238,7 @@ end
 local function fnc_get_seq_hlp(obj_ext)
 	local	tbl_mcr = fnc_mcr_cond_find(obj_ext)
 	local	tbl_hlp = { }
-	for ii_id, ii_obj in pairs(tbl_mcr)
+	for	ii_id, ii_obj in pairs(tbl_mcr)
 	do	tbl_insert(tbl_hlp, fnc_key_prettify(ii_obj.key_full).." - "..ii_obj.mcr.description)
 	end
 	local	txt_hlp = next(tbl_hlp) and tbl_concat(tbl_hlp, "\n") or false
@@ -259,15 +259,7 @@ local function runMacroOrKey(key)
 	return	eval_res
 end
 
---[[ have to be base key, as in "CtrlRAltA" is "A":
-local rgx_key_parse = regex.new( "^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)$")
---[=[! have NOT to be base key, as in "CtrlRAltA" is NiL:]]
 local rgx_key_parse = regex.new("/^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$/i")
---[[ todo:
-local rgx_key_parse = regex.new( "^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$")
-return rgx_key_parse:match(("LCtrlRAlt"):lower())
---]]
-
 local function fnc_key_parse(the_key)
 	local RLctl, RLalt, shift, plain = rgx_key_parse:match(the_key)
 	return {
@@ -339,7 +331,6 @@ local function fnc_key_equal(key_base, key_comp)
 	end
 	return false
 end -- fnc_key_equal
-
 
 local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 	return not flg_ext_mod_off and (obj_handler.priority or true)
