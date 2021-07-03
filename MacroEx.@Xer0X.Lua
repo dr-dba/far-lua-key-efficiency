@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.6.2.1",
+	version_mod	= "1.6.2.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -500,6 +500,11 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	and	copy_key_val.key
 	and	copy_key_val.area
 	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	elseif	copy_key_idx == "KXP"
+	then	if not	tbl_dest_loc[copy_key_idx]
+		then	tbl_dest_loc[copy_key_idx] = copy_key_val
+		end
+		return true
 	end
 end
 
