@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.6.1",
+	version_mod	= "1.6.1.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -40,7 +40,7 @@ local nfo = Info({
 				= true,
 		allow_seq_in_ext= true,
 		Delay		=  400, 
-		DelaySeq	= 5000,
+		DelaySeq	= 2000,
 		ext_modes 	= {
 			HLD = true, -- holding
 			DBL = true, -- double
