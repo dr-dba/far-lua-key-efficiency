@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.18",
+	version_mod	= "1.5.19",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -329,7 +329,7 @@ local function fnc_key_expand(the_key, in_lower, str_id, as_received)
 	until not alt
 	ctl = str_lower(ctl or "") == L and not as_received and R 
 	until not ctl
-	return tbl_exp
+	return tbl_exp, obj_key
 end -- fnc_key_expand
 
 local function fnc_key_equal(key_base, key_comp)
@@ -448,25 +448,23 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			else	-- got the next key
 				t_last_key = t_wait_key
 				key_rec_new = far_NameToInputRecord(key_str_new)
-				local	key_str_run = key_str_new
-				local	key_str_try
 				if	band(key_rec_new.ControlKeyState, MOD_MASK)
-				==	band(key_rec	.ControlKeyState, MOD_MASK)
-				then	key_str_try = fnc_key_parse(key_str_new).plain
-				else	if	BREAK_SEQ_ON_MOD_RELEASE
+				~=	band(key_rec	.ControlKeyState, MOD_MASK)
+				then	if	BREAK_SEQ_ON_MOD_RELEASE
 					then	run_normal = true
 						break
 					end
 				end
+				local	key_str_run = key_str_new
 				::seq_key_test::
-				local	key_exp_run = fnc_key_expand(key_str_run, "in_lower", "real_key_str", "received")
-				local	key_str_seq,
-					key_obj_seq = fnc_key_equal( key_exp_run, key_ext.SEQ)
+				local	key_exp_run, key_parsed = fnc_key_expand(key_str_run, "in_lower", "real_key_str", "received")
+				local	key_str_seq, key_obj_seq = fnc_key_equal(key_exp_run, key_ext.SEQ)
 				if not	key_str_seq
-				and not BREAK_SEQ_ON_MOD_RELEASE
-				and	key_str_try
-				and	key_str_try ~= key_str_run
-				then	key_str_run  = key_str_try
+				--[[ here check for incomplience with CtlState already done a few lines before.
+				KXP.key as "plain" key cant be used here, since it is NEW key]]
+				and	key_parsed.plain
+				and	key_str_run~= key_parsed.plain
+				then	key_str_run = key_parsed.plain
 					goto seq_key_test
 				end
 				if	key_str_seq -- ? is it registered sequence key
