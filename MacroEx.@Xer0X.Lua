@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.5.19",
+	version_mod	= "1.5.20",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -389,7 +389,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local area = str_lower(Area.Current)
 	local key_str_new = "" -- have to be not null
 	if	key_ext.EXT -- just a flag for the extended mode existence here
-	then	repeat
+	then
+		repeat
 			if fnc_is_cas_mod_rls(cas_int) then break end
 			key_str_new, t_wait_key = obj_waitkeys:save(50)
 			if key_str_new ~="" then break end
@@ -448,31 +449,31 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			else	-- got the next key
 				t_last_key = t_wait_key
 				key_rec_new = far_NameToInputRecord(key_str_new)
-				if	band(key_rec_new.ControlKeyState, MOD_MASK)
-				~=	band(key_rec	.ControlKeyState, MOD_MASK)
-				then	if	BREAK_SEQ_ON_MOD_RELEASE
-					then	run_normal = true
-						break
-					end
+				local	cas_mod_is_same = 
+						band(key_rec_new.ControlKeyState, MOD_MASK) ==
+						band(key_rec	.ControlKeyState, MOD_MASK)
+				if not	cas_mod_is_same
+				and	BREAK_SEQ_ON_MOD_RELEASE
+				then	run_normal = true
+					break
 				end
 				local	key_str_run = key_str_new
 				::seq_key_test::
 				local	key_exp_run, key_parsed = fnc_key_expand(key_str_run, "in_lower", "real_key_str", "received")
 				local	key_str_seq, key_obj_seq = fnc_key_equal(key_exp_run, key_ext.SEQ)
 				if not	key_str_seq
-				--[[ here check for incomplience with CtlState already done a few lines before.
-				KXP.key as "plain" key cant be used here, since it is NEW key]]
-				and	key_parsed.plain
-				and	key_str_run~= key_parsed.plain
-				then	key_str_run = key_parsed.plain
+				and	cas_mod_is_same
+				and	key_parsed.plain -- false in the kind of RCtrlAlt
+				and	key_str_run ~= key_parsed.plain
+				then	key_str_run  = key_parsed.plain
 					goto seq_key_test
 				end
 				if	key_str_seq -- ? is it registered sequence key
 				then
 					key_ext_pre = key_ext
+					key_ext = key_obj_seq
 					key_rec_pre = key_rec
 					key_rec = key_rec_new
-					key_ext	= key_obj_seq
 					sz_seq_chain = sz_seq_chain.."-"..str_gsub(key_str_run, "-", "Minus")
 					obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 1000)
 					if 	key_ext.SCR
