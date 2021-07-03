@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.6.1.1",
+	version_mod	= "1.6.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -128,6 +128,8 @@ local tbl_insert= table.insert
 local mf_waitkey= mf.waitkey
 local win_uuid	= win.Uuid
 
+local far_Message = far.Message
+
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 local KEY_STR_FMT	= "%s%s%s%s"
 local KEY_CAS_FMT	= "%s%s%s"
@@ -143,7 +145,7 @@ local vkc_no_repeat	-- prevent senseless repeating the same key
 local function fnc_err_msg(msg, ...)
 	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
 	local	buttons = select('#', ...) > 0 and "Ok;&Lua explorer" or "Ok"
-	repeat	local	a_msg_res = far.Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
+	repeat	local	a_msg_res = far_Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
 		if	a_msg_res == 2
 		then	-- to view args
 			fnc_lua_exp({ ... }, msg)
@@ -196,7 +198,6 @@ Event {	description = "MacroEx helper",
 			if	key_inp_rec.VirtualKeyCode == vkc_no_repeat
 			and	key_inp_rec.KeyDown
 			then	-- eat repetitions
-				fnc_dbg_dmp_tbl(key_inp_rec, "key_inp_rec")
 				return 1
 			else
 				local aaa = 1 + Far.UpTime
@@ -244,47 +245,6 @@ local function fnc_get_seq_hlp(obj_ext)
 	return	txt_hlp
 end -- fnc_get_seq_hlp
 
--- ?? premake help or store macros
-local tbl_key_hlp_cache = { }
-local function fnc_get_seq_hlp__orig(seq_key)
-	local	txt_help = tbl_key_hlp_cache[seq_key]
-	if	txt_help ~= nil
-	then	return txt_help
-	end
-	local tbl_help	= { }
-	local area_re	= "%f[%a]"..str_lower(Area.Current).."%f[%A]"
-	local key_re	= "%f[%a]"..str_lower(seq_key).."%-"
-	for ii = 1, #Xer0X.utils.LoadedMacros
-	do
-		local	ii_mcr = Xer0X.utils.LoadedMacros[ii] 
-		if not	ii_mcr then break end
-		-- ?? use GetMacro
-		if	ii_mcr.key
-		and not ii_mcr.keyregex
-		then
-			local ii_mcr_area_low = string.lower(ii_mcr.area)
-			if string.match(string.lower(ii_mcr.key), key_re)
-			then
-				-- ?? checkFlags, CheckFileName
-				if (	ii_mcr_area_low == "common"
-				or	str_find(ii_mcr_area_low, area_re)
-						)
-				and not ii_mcr.disabled
-				and (	ii_mcr.condition == nil
-				or type(ii_mcr.condition) == "function"
-				and	ii_mcr.condition(seq_key)
-				or	ii_mcr.condition
-						)
-				then	-- ?? pcall
-					tbl_insert(tbl_help, ii_mcr.description or ii_mcr.key)
-				end
-			end
-		end
-	end
-	txt_help = next(tbl_help) and table.concat(tbl_help, "\n") or false
-	tbl_key_hlp_cache[seq_key] = txt_help
-	return txt_help
-end -- fnc_get_seq_hlp
 
 local function runMacro(key, ext)
 	local	eval_res = eval(key..(ext and ext or ""), 2)
@@ -488,7 +448,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			then    seq_hlp_msg = seq_hlp_msg or fnc_get_seq_hlp(key_ext)
 				if	seq_hlp_msg
 				then	obj_status:stop()
-					far.Message(seq_hlp_msg, trig_key_show, "", "l")
+					far_Message(seq_hlp_msg, sz_seq_chain, "", "l")
 				else	run_normal = true
 					anassigned_msg = str_format("%s No scripts assigned", sz_seq_chain or "")
 					break
@@ -496,7 +456,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			else	obj_status:set(sz_seq_chain.." ..?", nil, 1000)
 			end
 		end
-		if	str_ext 
+		if	str_ext
 		then -- some keyboard event happened
 			t_last_key = t_wait_key
 			seq_hlp_msg = nil
@@ -527,8 +487,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		flg_ext_mod_off = false
 		obj_status:set(anassigned_msg or str_format(
 			"%s anassigned, run_norm: %s, timeout: %s, key_str_new: %s",
-			trig_key_real, tostring(run_normal), tostring(is_hld_timeout), tostring(key_str_new)
-				), nil, 3000)
+				trig_key_real, tostring(run_normal), tostring(is_hld_timeout), tostring(key_str_new)
+			), nil, 3000)
 		-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		mf.beep()
 		return
