@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.7.2.1",
+	version_mod	= "1.7.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -259,6 +259,7 @@ local function fnc_key_parse(the_key)
 end
 
 local function fnc_key_expand(the_key, in_lower, str_id, as_received)
+	if not the_key then return end
 --	assert(key:match("^%l+$"))
 	local R =	in_lower and "r"	or "R"
 	local L	=	in_lower and "l"	or "L"
@@ -306,6 +307,10 @@ local function fnc_key_expand(the_key, in_lower, str_id, as_received)
 end -- fnc_key_expand
 
 local function fnc_key_equal(key_base, key_comp)
+	if not	key_base
+	or not	key_comp
+	then	return
+	end
 	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, true)
 	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, true)
 	for ii_base, ii_base_val in pairs(tbl_base) do
@@ -435,10 +440,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	if	run_mode == "ask_normal"
 	then
 		mf.beep() -- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
-		local	bad_key_seq = str_format("%s+%s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
+		local	bad_key_seq = str_format("%s + %s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
 		local	a_msg_res = far.Message(
-				tbl_concat(obj_waitkeys.keys, ", "), 
-				str_format("%s wrong sequence, do you want to run these keys as normal?", bad_key_seq),
+				bad_key_seq.."\n\1\nDo you want to run these keys as normal?\n\1\n"..tbl_concat(obj_waitkeys.keys, ", ").."\n\2", 
+				"WRONG SEQUENCE", 
 				";OkCancel", "w"
 					) 
 		if	a_msg_res == 1
