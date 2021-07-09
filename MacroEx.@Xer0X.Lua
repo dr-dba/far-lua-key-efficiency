@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.7.3",
+	version_mod	= "1.7.4",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -229,7 +229,7 @@ local function fnc_get_seq_hlp(obj_ext)
 	for	ii_id, ii_obj in pairs(tbl_mcr)
 	do	tbl_insert(tbl_hlp, fnc_key_prettify(ii_obj.key_full).." - "..ii_obj.mcr.description)
 	end
-	local	txt_hlp = next(tbl_hlp) and tbl_concat(tbl_hlp, "\n") or false
+	local	txt_hlp = next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress Escape to cancel the sequence" or false
 	return	txt_hlp
 end -- fnc_get_seq_hlp
 
