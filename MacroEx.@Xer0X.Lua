@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.7.1",
+	version_mod	= "1.7.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -359,6 +359,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
 	repeat
 		key_str_new, t_wait_key = obj_waitkeys:save(50)
+		if	key_str_new == "Esc"
+		then	run_mode = "cancel"; break
+		end
 		local	is_hld_timeout = t_wait_key - t_last_key > OPT_DELAY
 		local	is_seq_timeout = t_wait_key - t_last_key > OPT_DELAY_SEQ
 		local	was_hld = key_str_bas and key_str_new == "" and is_hld_timeout and fnc_is_holding(key_rec)
@@ -431,17 +434,25 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	far.RestoreScreen(obj_scr)
 	if	run_mode == "normal"
 	then
-		flg_ext_mod_off = true
-		for ii = 1, #obj_waitkeys.keys
-		do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
-		end
-		flg_ext_mod_off = false
-		obj_status:set(str_format("%s+%s anassigned",
-			sz_seq_chain, key_str_new or key_str_bas or key_ext.KXP and key_ext.KXP.rec or key_ext.EXT
-				), nil, 3000)
 		-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		mf.beep()
-	elseif	run_mode == "seq_ext"
+		local	bad_key_seq = str_format("%s+%s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
+		local	a_msg_res = far.Message(
+				tbl_concat(obj_waitkeys.keys, ", "), 
+				str_format("%s wrong sequence, do you want to run these keys as normal?", bad_key_seq),
+				";OkCancel", "w"
+					) 
+		if	a_msg_res == 1 
+		then	obj_status:set(str_format("%s anassigned run normal", bad_key_seq), nil, 2500)
+			flg_ext_mod_off = true
+			for ii = 1, #obj_waitkeys.keys
+			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
+			end
+			flg_ext_mod_off = false
+		else	obj_status:set(str_format("%s anassigned cancelled", bad_key_seq), nil, 2500)
+		end
+	elseif	
+		run_mode == "seq_ext"
 	then
 		obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 100000)
 		local	eval_ok, eval_res = runMacro(sz_seq_chain)
@@ -453,8 +464,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 		end
 		obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
-	elseif	run_mode == "cancel"
-	then	-- todo
+	elseif	
+		run_mode == "cancel"
+	then	
+		obj_status:set(str_format("%s sequence canceled", sz_seq_chain, 3000))
 	end
 end -- fnc_hnd_mcr_action
 
