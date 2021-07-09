@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.7.2",
+	version_mod	= "1.7.2.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -351,7 +351,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext =	obj_handler.key_ext
 	local key_rec =	far_NameToInputRecord(key_str_bas)
 	local t_last_key = Far.UpTime
-	local run_mode = "normal" 
+	local run_mode = "ask_normal" 
 	local sz_seq_chain = str_gsub(key_str_bas, "-", "Minus")
 	local obj_scr = far.SaveScreen()
 	obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
@@ -432,24 +432,23 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		end
 	until false
 	far.RestoreScreen(obj_scr)
-	if	run_mode == "normal"
+	if	run_mode == "ask_normal"
 	then
-		-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
-		mf.beep()
+		mf.beep() -- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		local	bad_key_seq = str_format("%s+%s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
 		local	a_msg_res = far.Message(
 				tbl_concat(obj_waitkeys.keys, ", "), 
 				str_format("%s wrong sequence, do you want to run these keys as normal?", bad_key_seq),
 				";OkCancel", "w"
 					) 
-		if	a_msg_res == 1 
+		if	a_msg_res == 1
 		then	obj_status:set(str_format("%s anassigned run normal", bad_key_seq), nil, 2500)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
 			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 			end
 			flg_ext_mod_off = false
-		else	obj_status:set(str_format("%s anassigned cancelled", bad_key_seq), nil, 2500)
+		else	obj_status:set(str_format("%s anassigned run cancel", bad_key_seq), nil, 2500)
 		end
 	elseif	
 		run_mode == "seq_ext"
