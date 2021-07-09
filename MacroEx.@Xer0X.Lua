@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.6.2.2",
+	version_mod	= "1.7.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -90,20 +90,13 @@ local MOD_MASK = bor(
 local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
 local	tbl_ext_mode_show = { DBL = ":Double",	HLD = ":Hold"}
 local	Xer0X = require("Lib-Common-@Xer0X")
-local	req_ok, req_msg, fnc_lua_exp	= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
+local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
 if not	req_ok
-then	req_ok, req_msg, fnc_lua_exp	= Xer0X.fnc_safe_require("LE")
+then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
 end
-local	as_mdl, inp_args, own_fpath	= Xer0X.fnc_file_whoami({ ... })
+local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
 local	FileName = ... or own_fpath
-local	Macro = Macro
-local	Event = Event
-local	tbl_mcr_env, tbl_mcr_exinf
-if not	Macro
-then	tbl_mcr_env, tbl_mcr_exinf	= Xer0X.fnc_macro_one_load(nil, own_fpath, false, true)
-	Macro = tbl_mcr_env.Macro
-	Event = tbl_mcr_env.Event
-end
+
 
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
@@ -134,11 +127,8 @@ local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 local KEY_STR_FMT	= "%s%s%s%s"
 local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
-local	tbl_handlers	= Xer0X.tbl_macro_ex_handlers
-if not	tbl_handlers
-then	tbl_handlers = { }
-	Xer0X.tbl_macro_ex_handlers = tbl_handlers
-end
+local tbl_handlers	= { }
+Xer0X.tbl_macro_ex_handlers = tbl_handlers
 local flg_ext_mod_off	-- to disable handler in order to run original macro
 local vkc_no_repeat	-- prevent senseless repeating the same key
 
@@ -200,8 +190,6 @@ Event {	description = "MacroEx helper",
 			then	-- eat repetitions
 				return 1
 			else
-				local aaa = 1 + Far.UpTime
-				local bbb = aaa + Far.UpTime
 				vkc_no_repeat = false
 			end
 		end
@@ -358,131 +346,115 @@ local obj_waitkeys = {
 }
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local key_ext_pre, key_rec_pre, key_rec_new, seq_hlp_msg, is_timeout, run_normal, anassigned_msg
-	local trig_key_real = akey(1, 0) 
-	local trig_key_show = akey(1, 1)
-	local key_str_cur = akey(1, 0)
+	local key_ext_pre, key_ext_new, key_rec_pre, seq_hlp_msg, key_str_new, t_wait_key
+	local key_str_bas = akey(1, 0) 
 	local key_ext =	obj_handler.key_ext
-	local key_rec =	far_NameToInputRecord(key_str_cur)
-	local sz_seq_chain = str_gsub(trig_key_show, "-", "Minus")
+	local key_rec =	far_NameToInputRecord(key_str_bas)
 	local t_last_key = Far.UpTime
-	local t_wait_key = t_last_key -- cant be empty
-	local area = str_lower(Area.Current)
-	local key_str_new = "" -- have to be not null
-	vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
-	obj_waitkeys:init(key_str_cur)
+	local run_mode = "normal" 
+	local sz_seq_chain = str_gsub(key_str_bas, "-", "Minus")
 	local obj_scr = far.SaveScreen()
+	obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
+	obj_waitkeys:init(key_str_bas)
+	vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
 	repeat
-		if	fnc_is_cas_mod_rls(key_rec)
-		and	BREAK_SEQ_ON_MOD_RELEASE
-		or not( key_ext.SEQ
-		or	key_ext.EXT)
-		then	run_normal = true
-			break
-		end
+		key_str_new, t_wait_key = obj_waitkeys:save(50)
 		local	is_hld_timeout = t_wait_key - t_last_key > OPT_DELAY
 		local	is_seq_timeout = t_wait_key - t_last_key > OPT_DELAY_SEQ
-		local	was_hld = key_str_cur ~= "" and key_str_new == "" and is_hld_timeout and fnc_is_holding(key_rec)
-		local	was_dbl = key_str_cur ~= "" and key_str_new ~= "" and fnc_key_equal(key_str_new, key_str_cur)
+		local	was_hld = key_str_bas and key_str_new == "" and is_hld_timeout and fnc_is_holding(key_rec)
+		local	was_dbl = key_str_bas and key_str_new ~= "" and fnc_key_equal(key_str_new, key_str_bas)
 		local	str_ext =
-				was_hld and key_ext.HLD and "HLD" or	-- [area] or obj_handler.HLD.common
-				was_dbl and key_ext.DBL and "DBL"	-- [area] or obj_handler.DBL.common
+				was_hld and key_ext.HLD and "HLD" or
+				was_dbl and key_ext.DBL and "DBL"
 		if	str_ext
 		then
-			key_ext_pre = key_ext
-			key_ext = key_ext[str_ext]
+			key_ext_new = key_ext[str_ext]
 			sz_seq_chain = sz_seq_chain..tbl_ext_mode_show[str_ext]
-			key_str_cur = ""
+			key_str_bas = false
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
-			if	key_ext.SEQ
-			then
-				local	key_rec_new = far_NameToInputRecord(key_str_new)
-				local	cas_mod_is_same =
-						band(key_rec_new.ControlKeyState, MOD_MASK) ==
-						band(key_rec	.ControlKeyState, MOD_MASK)
-				if not	cas_mod_is_same
-				and	BREAK_SEQ_ON_MOD_RELEASE
-				then	run_normal = true
-					break
-				end
-				local	key_str_try = key_str_new
-				::seq_key_try::
-				local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, "in_lower", "real_key_str", "received")
-				local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
-				if not	key_str_seq
-				and	cas_mod_is_same
-				and	key_obj_try.plain -- false in the kind of RCtrlAlt
-				and	key_str_try ~= key_obj_try.plain
-				then	key_str_try  = key_obj_try.plain
-					goto seq_key_try
-				end
-				if	key_str_seq -- ? is it registered sequence key
-				then
-					str_ext = "SEQ"
-					key_ext_pre = key_ext
-					key_ext = key_obj_seq
-					key_rec_pre = key_rec
-					key_rec = key_rec_new
-					key_str_cur = key_str_new
-					vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
-					sz_seq_chain = sz_seq_chain.."-"..str_gsub(key_str_try, "-", "Minus")
-				end
-			end -- of "if key_ext.SEQ"
-			if not	str_ext -- should be "SEQ" or NiL
-			then	run_normal = true
-				break
+			local	key_rec_new = far_NameToInputRecord(key_str_new)
+			local	cas_mod_is_same =
+					band(key_rec_new.ControlKeyState, MOD_MASK) ==
+					band(key_rec	.ControlKeyState, MOD_MASK)
+			if not	cas_mod_is_same
+			and	BREAK_SEQ_ON_MOD_RELEASE
+			then	break
 			end
-		else -- no sequence/HLD/DBL
+			local	key_str_try = key_str_new
+			::seq_key_try::
+			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, "in_lower", "real_key_str", "received")
+			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
+			if not	key_str_seq
+			and	cas_mod_is_same
+			and	key_obj_try.plain -- false in the kind of RCtrlAlt
+			and	key_str_try ~= key_obj_try.plain
+			then	key_str_try  = key_obj_try.plain
+				goto seq_key_try
+			end
+			if not	key_str_seq -- ? is it registered sequence key
+			then	break 
+			end
+			str_ext = "SEQ"
+			key_ext_new = key_obj_seq
+			key_rec_pre = key_rec
+			key_rec = key_rec_new
+			key_str_bas = key_str_new 
+			vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
+			sz_seq_chain = sz_seq_chain.."-"..str_gsub(key_str_bas, "-", "Minus")
+		else -- no SEQ/HLD/DBL
 			if	is_seq_timeout
 			then    seq_hlp_msg = seq_hlp_msg or fnc_get_seq_hlp(key_ext)
-				if	seq_hlp_msg
-				then	obj_status:stop()
-					far_Message(seq_hlp_msg, sz_seq_chain, "", "l")
-				else	run_normal = true
-					anassigned_msg = str_format("%s No scripts assigned", sz_seq_chain or "")
-					break
-				end
-			else	obj_status:set(sz_seq_chain.." ..?", nil, 1000)
+				far_Message(seq_hlp_msg, sz_seq_chain, "", "l")		
 			end
 		end
 		if	str_ext
 		then -- some keyboard event happened
 			t_last_key = t_wait_key
-			seq_hlp_msg = nil
+			seq_hlp_msg = nil -- since key changed
+			key_ext_pre = key_ext
+			key_ext = key_ext_new
+			obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
 			if	key_ext.SCR
-			then	obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 100000)
-				local	eval_ok, eval_res = runMacro(sz_seq_chain)
-				if not	eval_ok
-				and	eval_res == -2
-				then -- just take the first macro object:
-					local scr_key, scr_mcr = next(key_ext.SCR)
-					eval_res = eval(scr_key, 2)
-					eval_ok = eval_res ~= EVAL_MACRONOTFOUND
-				end
-				far.RestoreScreen(obj_scr); obj_scr = nil
-				obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
-				return
+			then	run_mode = "seq_ext"
+				break
 			end
 		end
-		key_str_new, t_wait_key = obj_waitkeys:save(50)
+		if	fnc_is_cas_mod_rls(key_rec)
+		and	BREAK_SEQ_ON_MOD_RELEASE
+		or  not key_ext.SEQ
+		and not key_ext.EXT
+		then	break
+		end
 	until false
-	if obj_scr then far.RestoreScreen(obj_scr) end
-	if	run_normal
+	far.RestoreScreen(obj_scr)
+	if	run_mode == "normal"
 	then
 		flg_ext_mod_off = true
 		for ii = 1, #obj_waitkeys.keys
 		do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 		end
 		flg_ext_mod_off = false
-		obj_status:set(anassigned_msg or str_format(
-			"%s anassigned, run_norm: %s, timeout: %s, key_str_new: %s",
-				trig_key_real, tostring(run_normal), tostring(is_hld_timeout), tostring(key_str_new)
-			), nil, 3000)
+		obj_status:set(str_format("%s+%s anassigned",
+			sz_seq_chain, key_str_new or key_str_bas or key_ext.KXP and key_ext.KXP.rec or key_ext.EXT
+				), nil, 3000)
 		-- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		mf.beep()
-		return
+	elseif	run_mode == "seq_ext"
+	then
+		obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 100000)
+		local	eval_ok, eval_res = runMacro(sz_seq_chain)
+		if not	eval_ok
+		and	eval_res == -2
+		then -- just take the first macro object:
+			local scr_key, scr_mcr = next(key_ext.SCR)
+			eval_res = eval(scr_key, 2)
+			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
+		end
+		obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
+	elseif	run_mode == "cancel"
+	then	-- todo
 	end
 end -- fnc_hnd_mcr_action
 
