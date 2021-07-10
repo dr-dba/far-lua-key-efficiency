@@ -12,4 +12,6 @@ https://github.com/dr-dba/far-lua-general-utils<br />
 Lib-Common<br /><br />
 https://github.com/dr-dba/far-lua-diagnostics<br />
 StackTracePlusPlus<br /><br />
+https://github.com/dr-dba/lua-serialize<br />
+dmp-tbl-alt<br /><br />
 
