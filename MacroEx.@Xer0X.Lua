@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.8.1",
+	version_mod	= "1.8.1.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -133,7 +133,8 @@ local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local tbl_handlers	= { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
-local tbl_normal_ask = loadfile(own_fpath..".dat")() or { }
+local tbl_normal_ask__load = loadfile(own_fpath..".dat")
+local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
 local flg_ext_mod_off	-- to disable handler in order to run an original macro
 local vkc_no_repeat	-- prevent senseless repeating the same key
 
