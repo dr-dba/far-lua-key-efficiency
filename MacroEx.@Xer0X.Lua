@@ -25,7 +25,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.7.4",
+	version_mod	= "1.8.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -89,7 +89,8 @@ local MOD_MASK = bor(
 		)
 local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
 local	tbl_ext_mode_show = { DBL = ":Double",	HLD = ":Hold"}
-local	Xer0X = require("Lib-Common-@Xer0X")
+local	Xer0X	= require("Lib-Common-@Xer0X")
+local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
 local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
 if not	req_ok
 then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
@@ -129,7 +130,8 @@ local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local tbl_handlers	= { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
-local flg_ext_mod_off	-- to disable handler in order to run original macro
+local tbl_normal_ask = loadfile(own_fpath..".dat")() or { }
+local flg_ext_mod_off	-- to disable handler in order to run an original macro
 local vkc_no_repeat	-- prevent senseless repeating the same key
 
 local function fnc_err_msg(msg, ...)
@@ -350,6 +352,10 @@ local obj_waitkeys = {
 	end
 }
 
+local function fnc_sett_data_store()
+	local res_val, file_hnd = dmp_srlz.fnc_file_save(tbl_normal_ask, { file_path = own_fpath..".dat", file_init = true, file_close = true })
+end
+
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext_pre, key_ext_new, key_rec_pre, seq_hlp_msg, key_str_new, t_wait_key
 	local key_str_bas = akey(1, 0) 
@@ -414,7 +420,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		else -- no SEQ/HLD/DBL
 			if	is_seq_timeout
 			then    seq_hlp_msg = seq_hlp_msg or fnc_get_seq_hlp(key_ext)
-				far_Message(seq_hlp_msg, sz_seq_chain, "", "l")		
+				far_Message(seq_hlp_msg, sz_seq_chain, "", "l")
 			end
 		end
 		if	str_ext
@@ -439,23 +445,39 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	far.RestoreScreen(obj_scr)
 	if	run_mode == "ask_normal"
 	then
-		mf.beep() -- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		local	bad_key_seq = str_format("%s + %s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
-		local	a_msg_res = far.Message(
-				bad_key_seq.."\n\1\nDo you want to run these keys as normal?\n\1\n"..tbl_concat(obj_waitkeys.keys, ", ").."\n\2", 
-				"WRONG SEQUENCE", 
-				";OkCancel", "w"
-					) 
-		if	a_msg_res == 1
-		then	obj_status:set(str_format("%s anassigned run normal", bad_key_seq), nil, 2500)
+		if not	tbl_normal_ask[Area.Current]
+		then	tbl_normal_ask[Area.Current] = { }
+		end
+		local	inf_saved = tbl_normal_ask[Area.Current][bad_key_seq]
+		local	cnt_use = inf_saved and inf_saved % 1000000 or 0
+		local	res_msg = inf_saved and (inf_saved - cnt_use) / 1000000
+		if not  res_msg
+		then	res_msg = far.Message(
+				bad_key_seq.."\n\1\nDo you want to run these keys as normal?\n\1\n"..tbl_concat(obj_waitkeys.keys, ", ").."\n\2",
+				"WRONG SEQUENCE",
+				"&YES;yes &save;&NOT;not sav&e", "w"
+					)			
+		end
+		if	res_msg == 2
+		or	res_msg == 4
+		then	tbl_normal_ask[Area.Current][bad_key_seq] = res_msg * 1000000 + cnt_use + 1
+			if	cnt_use == 0
+			then	fnc_sett_data_store()
+			end
+		end
+		if	res_msg == 1 -- run normal, not saved
+		or	res_msg == 2 -- run normal, saved as default response
+		then	obj_status:set(str_format("%s anassigned run normal%s", bad_key_seq, res_msg == 2 and " (saved)" or ""), nil, 2500)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
 			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 			end
 			flg_ext_mod_off = false
-		else	obj_status:set(str_format("%s anassigned run cancel", bad_key_seq), nil, 2500)
+		else	obj_status:set(str_format("%s anassigned run cancel%s", bad_key_seq, res_msg == 4 and " (saved)" or ""), nil, 2500)
+			mf.beep() -- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		end
-	elseif	
+	elseif
 		run_mode == "seq_ext"
 	then
 		obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 100000)
@@ -468,9 +490,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 		end
 		obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
-	elseif	
+	elseif
 		run_mode == "cancel"
-	then	
+	then
 		obj_status:set(str_format("%s sequence canceled", sz_seq_chain, 3000))
 	end
 end -- fnc_hnd_mcr_action
@@ -653,6 +675,11 @@ local function fnc_macro_ex_build_all()
 	fnc_macro_ex_create(tbl_handlers)
 	return tbl_handlers
 end -- fnc_macro_ex_build_all
+
+Event { group = "ExitFAR",
+	description = "Save MacroEx data and statistics on exit",
+	action = function() fnc_sett_store() end
+}
 
 if	as_mdl
 then
