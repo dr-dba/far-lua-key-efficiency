@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.8.1.2",
+	version_mod	= "1.8.1.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -42,7 +42,7 @@ local nfo = Info({
 		allow_seq_with_any_mod
 				= true,
 		allow_seq_in_ext= true,
-		Delay		=  400, 
+		Delay		=  400, -- 500 is ok
 		DelaySeq	= 2000,
 		ext_modes 	= {
 			HLD = true, -- holding
@@ -341,7 +341,7 @@ local obj_waitkeys = {
 		local type_keys = type(keys)
 		self.keys= type_keys == "nil"	and { }
 			or type_keys == "table"	and keys
-			or { keys } 
+			or { keys } -- should be string
 		self.no_key = nil
 	end,
 	save = function(self, ...)
@@ -366,7 +366,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext =	obj_handler.key_ext
 	local key_rec =	far_NameToInputRecord(key_str_bas)
 	local t_last_key = Far.UpTime
-	local run_mode = "ask_normal" 
+	local run_mode = "ask_normal" -- default mode
 	local sz_seq_chain = str_gsub(key_str_bas, "-", "Minus")
 	local obj_scr = far.SaveScreen()
 	obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
@@ -406,13 +406,14 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
 			if not	key_str_seq
 			and	cas_mod_is_same
+			-- KXP.key as "plain" key cant be used here, since it is NEW key
 			and	key_obj_try.plain -- false in the kind of RCtrlAlt
 			and	key_str_try ~= key_obj_try.plain
 			then	key_str_try  = key_obj_try.plain
 				goto seq_key_try
 			end
 			if not	key_str_seq -- ? is it registered sequence key
-			then	break 
+			then	break -- run normal
 			end
 			str_ext = "SEQ"
 			key_ext_new = key_obj_seq
