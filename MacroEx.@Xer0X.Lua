@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.8.0",
+	version_mod	= "1.8.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -496,7 +496,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	elseif
 		run_mode == "cancel"
 	then
-		obj_status:set(str_format("%s sequence canceled", sz_seq_chain, 3000))
+		obj_status:set(str_format("%s sequence canceled", sz_seq_chain), nil, 3000)
 	end
 end -- fnc_hnd_mcr_action
 
@@ -681,7 +681,7 @@ end -- fnc_macro_ex_build_all
 
 Event { group = "ExitFAR",
 	description = "Save MacroEx data and statistics on exit",
-	action = function() fnc_sett_store() end
+	action = function() fnc_sett_data_store() end
 }
 
 if	as_mdl
