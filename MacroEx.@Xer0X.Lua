@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.8.1.1",
+	version_mod	= "1.8.1.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -454,14 +454,18 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then	tbl_normal_ask[Area.Current] = { }
 		end
 		local	inf_saved = tbl_normal_ask[Area.Current][bad_key_seq]
-		local	cnt_use = inf_saved and inf_saved % 1000000 or 0
+		local	cnt_use = inf_saved and (inf_saved % 1000000) or 0
 		local	res_msg = inf_saved and (inf_saved - cnt_use) / 1000000
 		if not  res_msg
 		then	res_msg = far.Message(
-				bad_key_seq.."\n\1\nDo you want to run these keys as normal?\n\1\n"..tbl_concat(obj_waitkeys.keys, ", ").."\n\2",
+				str_format(
+					"%s\n\1\nDo you want to run these keys as normal in %s?\n\1\n%s\n\2", 
+					bad_key_seq, Area.Current, tbl_concat(obj_waitkeys.keys, ", ")
+						),
 				"WRONG SEQUENCE",
-				"&YES;yes &save;&NOT;not sav&e", "w"
-					)			
+				"&YES;yes &Save;&NOT;not sav&E", 
+				"w"
+					)
 		end
 		if	res_msg == 2
 		or	res_msg == 4
