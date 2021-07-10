@@ -12,6 +12,9 @@ Lib-Common-@Xer0X.Lua
 
 https://github.com/dr-dba/far-lua-diagnostics
 StackTracePlusPlus-@Xer0X.Lua
+
+https://github.com/dr-dba/lua-serialize
+dmp-tbl-alt-@Xer0X.Lua
 ]]
 
 -- ### OPTIONS BLOCK ###
