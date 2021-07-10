@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.8.1.3",
+	version_mod	= "1.9.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -133,10 +133,13 @@ local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local tbl_handlers	= { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
+Xer0X.tbl_ext_key_lev_hist = { }
+local tbl_key_lev_hist = Xer0X.tbl_ext_key_lev_hist
 local tbl_normal_ask__load = loadfile(own_fpath..".dat")
 local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
 local flg_ext_mod_off	-- to disable handler in order to run an original macro
-local vkc_no_repeat	-- prevent senseless repeating the same key
+local vkc_no_repeat
+local tbl_key_lev
 
 local function fnc_err_msg(msg, ...)
 	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
@@ -191,6 +194,7 @@ Event {	description = "MacroEx helper",
 		and	key_inp_rec.EventType == F.KEY_EVENT
 		and	key_inp_rec.VirtualKeyCode ~= 0
 		then	-- KEY_NONE? inp_rec.VirtualKeyCode == 0
+			-- prevent senseless repeating the same key
 			if	key_inp_rec.VirtualKeyCode == vkc_no_repeat
 			and	key_inp_rec.KeyDown
 			then	-- eat repetitions
@@ -361,38 +365,50 @@ local function fnc_sett_data_store()
 end
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local key_ext_pre, key_ext_new, key_rec_pre, seq_hlp_msg, key_str_new, t_wait_key
-	local key_str_bas = akey(1, 0) 
-	local key_ext =	obj_handler.key_ext
-	local key_rec =	far_NameToInputRecord(key_str_bas)
-	local t_last_key = Far.UpTime
-	local run_mode = "ask_normal" -- default mode
-	local sz_seq_chain = str_gsub(key_str_bas, "-", "Minus")
 	local obj_scr = far.SaveScreen()
-	obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
-	obj_waitkeys:init(key_str_bas)
-	vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
+	local key_ext_pre, key_ext_new, key_rec_pre, key_rec_new, key_str_new, t_wait_key
+	local run_mode = "ask_normal" -- default mode
+	local key_str_bas = akey(1, 0) 
+	local obj_key_lev = {
+		key_str_bas	= key_str_bas,				
+		key_str_bas_ext = key_str_bas,				
+		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),  
+		key_ext = obj_handler.key_ext,				
+		key_rec = far_NameToInputRecord(key_str_bas),		
+		key_time= Far.UpTime,					
+	}
+	tbl_key_lev = { obj_key_lev } -- init
+	local key_ext	= obj_key_lev.key_ext
+	local key_rec	= obj_key_lev.key_rec
+	local t_last_key= obj_key_lev.key_time
+	obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
+	obj_waitkeys:init(obj_key_lev.key_str_bas)
+	vkc_no_repeat = obj_key_lev.key_rec.VirtualKeyCode -- prevent autorepeat
 	repeat
 		key_str_new, t_wait_key = obj_waitkeys:save(50)
 		if	key_str_new == "Esc"
 		then	run_mode = "cancel"; break
 		end
-		local	is_hld_timeout = t_wait_key - t_last_key > OPT_DELAY
-		local	is_seq_timeout = t_wait_key - t_last_key > OPT_DELAY_SEQ
-		local	was_hld = key_str_bas and key_str_new == "" and is_hld_timeout and fnc_is_holding(key_rec)
-		local	was_dbl = key_str_bas and key_str_new ~= "" and fnc_key_equal(key_str_new, key_str_bas)
+		local	is_hld_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY	
+		local	is_seq_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_SEQ
+		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and is_hld_timeout and fnc_is_holding(obj_key_lev.key_rec)
+		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and fnc_key_equal(key_str_new, obj_key_lev.key_str_bas)
 		local	str_ext =
 				was_hld and key_ext.HLD and "HLD" or
 				was_dbl and key_ext.DBL and "DBL"
 		if	str_ext
 		then
-			key_ext_new = key_ext[str_ext]
-			sz_seq_chain = sz_seq_chain..tbl_ext_mode_show[str_ext]
 			key_str_bas = false
+			obj_key_lev.ext_type		= str_ext
+			obj_key_lev.key_str_bas_ext	= obj_key_lev.key_str_bas..tbl_ext_mode_show[obj_key_lev.ext_type]
+			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..tbl_ext_mode_show[obj_key_lev.ext_type]
+			obj_key_lev.key_ext_bas		= obj_key_lev.key_ext 
+			obj_key_lev.key_ext		= obj_key_lev.key_ext[obj_key_lev.ext_type]
+			key_ext_new = obj_key_lev.key_ext 
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
-			local	key_rec_new = far_NameToInputRecord(key_str_new)
+			key_rec_new = far_NameToInputRecord(key_str_new) -- real
 			local	cas_mod_is_same =
 					band(key_rec_new.ControlKeyState, MOD_MASK) ==
 					band(key_rec	.ControlKeyState, MOD_MASK)
@@ -415,42 +431,55 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			if not	key_str_seq -- ? is it registered sequence key
 			then	break -- run normal
 			end
-			str_ext = "SEQ"
-			key_ext_new = key_obj_seq
-			key_rec_pre = key_rec
-			key_rec = key_rec_new
-			key_str_bas = key_str_new 
-			vkc_no_repeat = key_rec.VirtualKeyCode -- prevent autorepeat
-			sz_seq_chain = sz_seq_chain.."-"..str_gsub(key_str_bas, "-", "Minus")
+			obj_key_lev.next_type = "SEQ"
+			obj_key_lev.next_key_str = key_str_new
+			obj_key_lev.next_key_lev = {
+				key_str_bas =	key_str_new,
+				key_ext_pre =	key_ext,
+				key_ext =	key_obj_seq,
+				key_rec_pre =	key_rec,
+				key_rec =	key_rec_new,
+				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(key_str_new, "-", "Minus"),
+				key_time=	t_wait_key,
+			}
+			obj_key_lev = obj_key_lev.next_key_lev
+			tbl_key_lev[#tbl_key_lev + 1] = obj_key_lev
+			str_ext		= "SEQ"
+			key_ext_new	= obj_key_lev.key_ext
+			key_rec_pre	= obj_key_lev.key_rec_pre
+			key_rec		= obj_key_lev.key_rec
+			key_str_bas	= obj_key_lev.key_str_bas 
+			vkc_no_repeat	= obj_key_lev.key_rec.VirtualKeyCode -- prevent autorepeat
 		else -- no SEQ/HLD/DBL
 			if	is_seq_timeout
-			then    seq_hlp_msg = seq_hlp_msg or fnc_get_seq_hlp(key_ext)
-				far_Message(seq_hlp_msg, sz_seq_chain, "", "l")
+			then    obj_key_lev.hlp_msg = obj_key_lev.hlp_msg or fnc_get_seq_hlp(obj_key_lev.key_ext)
+				far_Message(obj_key_lev.hlp_msg, obj_key_lev.key_str_seq, "", "l")
 			end
 		end
 		if	str_ext
 		then -- some keyboard event happened
-			t_last_key = t_wait_key
-			seq_hlp_msg = nil -- since key changed
-			key_ext_pre = key_ext
-			key_ext = key_ext_new
-			obj_status:set(sz_seq_chain.." ..?", nil, 10000000)
-			if	key_ext.SCR
+			t_last_key = t_wait_key 
+			key_ext_pre = key_ext	
+			key_ext = key_ext_new	
+			obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
+			if	obj_key_lev.key_ext.SCR
 			then	run_mode = "seq_ext"
 				break
 			end
 		end
-		if	fnc_is_cas_mod_rls(key_rec)
+		if	fnc_is_cas_mod_rls(obj_key_lev.key_rec)
 		and	BREAK_SEQ_ON_MOD_RELEASE
-		or  not key_ext.SEQ
-		and not key_ext.EXT
+		or  not obj_key_lev.key_ext.SEQ
+		and not obj_key_lev.key_ext.EXT
 		then	break
 		end
 	until false
+	tbl_key_lev.run_mode = run_mode -- debug purposes only
+	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev
 	far.RestoreScreen(obj_scr)
 	if	run_mode == "ask_normal"
 	then
-		local	bad_key_seq = str_format("%s + %s", sz_seq_chain, key_str_new and key_str_new ~= "" and key_str_new or "???")
+		local	bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq, key_str_new and key_str_new ~= "" and key_str_new or "???")
 		if not	tbl_normal_ask[Area.Current]
 		then	tbl_normal_ask[Area.Current] = { }
 		end
@@ -470,7 +499,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		end
 		if	res_msg == 2
 		or	res_msg == 4
-		then	tbl_normal_ask[Area.Current][bad_key_seq] = res_msg * 1000000 + cnt_use + 1
+		then -- to store(save) response for future use
+			tbl_normal_ask[Area.Current][bad_key_seq] = res_msg * 1000000 + cnt_use + 1
 			if	cnt_use == 0
 			then	fnc_sett_data_store()
 			end
@@ -489,8 +519,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	elseif
 		run_mode == "seq_ext"
 	then
-		obj_status:set(str_format("%s Run ?", sz_seq_chain), nil, 100000)
-		local	eval_ok, eval_res = runMacro(sz_seq_chain)
+		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 100000)
+		local	eval_ok, eval_res = runMacro(obj_key_lev.key_str_seq)
 		if not	eval_ok
 		and	eval_res == -2
 		then -- just take the first macro object:
@@ -498,11 +528,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			eval_res = eval(scr_key, 2)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 		end
-		obj_status:set(str_format("%s Run %s/%s", sz_seq_chain, eval_res, EVAL_RES[eval_res]), nil, 3000)
+		obj_status:set(str_format("%s Run %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
 	elseif
 		run_mode == "cancel"
 	then
-		obj_status:set(str_format("%s sequence canceled", sz_seq_chain), nil, 3000)
+		obj_status:set(str_format("%s sequence canceled", obj_key_lev.key_str_seq), nil, 3000)
 	end
 end -- fnc_hnd_mcr_action
 
