@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.10.1",
+	version_mod	= "1.10.1.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -63,7 +63,7 @@ local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
 local OPT_DEBUG			= opts.Debug
 local OPT_DELAY_SEQ		= opts.DelaySeq
 local OPT_DELAY_HLP		= opts.DelayHelp
-local OPT_DELAY			= opts.Delay
+local OPT_DELAY_EXT		= opts.DelayExt
 
 local F	= far.Flags
 local C = far.Colors
@@ -106,7 +106,6 @@ then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
 end
 local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
 local	FileName = ... or own_fpath
-
 
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
@@ -185,7 +184,7 @@ local far_NameToInputRecord = function(the_key)
 			or	fnc_combo_mod_try(	the_key)
 	if not	key_inp_rec
 	then    if OPT_DEBUG
-		then fnc_err_msg(str_format("Unexpected AKey: %q", obj_key_ext.KXP.rec))
+		then fnc_err_msg(str_format("Unexpected AKey: %q", the_key))
 		end
 	end
 	return key_inp_rec
@@ -419,8 +418,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		if	key_str_new == "Esc"
 		then	run_mode = "cancel"; break
 		end
-		local	is_hld_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY	
-		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and is_hld_timeout and fnc_is_holding(obj_key_lev.key_rec)
+		local	is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
+		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and is_ext_timeout and fnc_is_holding(obj_key_lev.key_rec)
 		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and fnc_key_equal(key_str_new, obj_key_lev.key_str_bas)
 		local	str_ext =
 				was_hld and key_ext.HLD and "HLD" or
@@ -484,8 +483,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			then	far_Message(
 					fnc_get_seq_hlp(
 						obj_key_lev.key_ext.SCP, 
-						-- KXP is the sign that we are not in an extended key
-						obj_key_lev.key_ext.KXP
+						obj_key_lev.key_ext.KXP -- here KXP is the flag that we are not in an extended key
 					),
 					obj_key_lev.key_str_seq, 
 					"", "l"
@@ -683,7 +681,8 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				tbl_kxp_ii[#tbl_kxp_ii + 1] = { exp = tbl_key_exp_jj, bas = jj_key_base, ext = jj_ext_mode, key = jj_key_seq }
 
 				local function fnc_loc_scr_key_gen(is_fin_key) 
-					return { [ii_key] = {
+				-- helper func, not done with usual table, only because we need to differentiate "is_fin_key"
+					return { [ii_key] = { 
 						key_level= jj,
 						key_path = tbl_key_ii,
 						key_path2= tbl_kxp_ii,
@@ -702,10 +701,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				then	tbl_ext_stub.SEQ = tbl_seq_stub
 				end
 				for kk_str, kk_val in pairs(tbl_key_exp_jj)
-				do 	tbl_ext_jj[kk_str] = {
-						EXT = jj_ext_mode and true,
-						KXP = kk_val,
-                                        }
+				do 	tbl_ext_jj[kk_str] = { EXT = jj_ext_mode and true, KXP = kk_val }
 					if	jj_ext_mode
 					then	tbl_ext_jj[kk_str][jj_ext_mode] = tbl_ext_stub
 					else	tbl_ext_jj[kk_str].SEQ = tbl_seq_stub
