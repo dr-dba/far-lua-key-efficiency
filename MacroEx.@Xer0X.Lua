@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.10.1.1",
+	version_mod	= "1.10.1.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -42,9 +42,9 @@ local nfo = Info({
 		allow_seq_with_any_mod
 				= true,
 		allow_seq_in_ext= true,
-		Delay		=  400, -- 500 is ok
+		DelayExt	=  400, -- 500 is ok
 		DelaySeq	= 2000,
-		DelayHelp	= 2000,
+		DelayHlp	= 2000,
 		ext_modes 	= {
 			HLD = true, -- holding
 			DBL = true, -- double
@@ -62,7 +62,7 @@ local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
 local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
 local OPT_DEBUG			= opts.Debug
 local OPT_DELAY_SEQ		= opts.DelaySeq
-local OPT_DELAY_HLP		= opts.DelayHelp
+local OPT_DELAY_HLP		= opts.DelayHlp
 local OPT_DELAY_EXT		= opts.DelayExt
 
 local F	= far.Flags
@@ -106,6 +106,7 @@ then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
 end
 local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
 local	FileName = ... or own_fpath
+
 
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
@@ -585,6 +586,8 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	and	copy_key_val.area
 	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
 	elseif	copy_key_idx == "KXP"
+	or	copy_key_idx == "key_path"
+	or	copy_key_idx == "key_pth2"
 	then	if not	tbl_dest_loc[copy_key_idx]
 		then	tbl_dest_loc[copy_key_idx] = copy_key_val
 		end
@@ -682,10 +685,10 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 
 				local function fnc_loc_scr_key_gen(is_fin_key) 
 				-- helper func, not done with usual table, only because we need to differentiate "is_fin_key"
-					return { [ii_key] = { 
+					return { [ii_key] = {
 						key_level= jj,
 						key_path = tbl_key_ii,
-						key_path2= tbl_kxp_ii,
+						key_pth2 = tbl_kxp_ii,
 						key_full = ii_key,
 						key_extn = jj_ext_mode,
 						key_base = jj_key_base,
@@ -714,7 +717,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	obj_mcr.data.key_seq_all = { }
 			end
 			if not	obj_mcr.data.key_seq_all[ii_key]
-			then	obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii
+			then	obj_mcr.data.key_seq_all[ii_key] = tbl_kxp_ii -- is better than tbl_key_ii
 			end
 			for kk, kk_area in pairs(fnc_str_split(str_lower(obj_mcr.area), "%s+", true))
 			do	if not	tbl_handlers_loc[kk_area]
