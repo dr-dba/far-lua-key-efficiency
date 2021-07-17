@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.0.1",
+	version_mod	= "2.0.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -231,9 +231,6 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 					mcr_extid = jj_mcr_id,
 					obj_macro = jj_mcr_obj,
 					key_final = ii_obj_coll.key_final,
-					key_level = ii_obj_coll.key_level,
-					key_base  = ii_obj_coll.key_base,
-					key_extn  = ii_obj_coll.key_extn,
 				}
 				tbl_res[jj_mcr_id] = jj_mcr_item
 			end
@@ -329,7 +326,7 @@ local function fnc_get_seq_hlp(key_scr, in_key_base, cond_prio_curr, tbl_key_seq
 	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
 		do	if	cond_prio_curr[ii_mcr_idx]
 			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
-			and(not	ii_mcr_item.key_extn
+			and(not	jj_key_path[#tbl_key_seq].ext -- current key level
 			or not	in_key_base)
 			then	--[[ to get rid of wrong keys in the help,
 				like in "CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
@@ -372,19 +369,21 @@ local function GetMacro(argKey, argUseCommon)
 	local Area_Names = { area_name, argUseCommon and area_name ~= "common" and "common" or nil }
 	local key = argKey:lower()
 	do 
-		local	from, to, ctrl, alt
+		local	from, to, ctrl, alt, start
 		do	from, to, ctrl = str_find(key, "^(r?ctrl)")
 		end
 		if	ctrl == "ctrl"
 		then	ctrl = "lctrl"
-		else 	from, to, ctrl = str_find(key, "^(l?ctrl)")
+		elseif	ctrl ~="rctrl"
+		then	from, to, ctrl = str_find(key, "^(l?ctrl)")
 		end
-		local	start = to and to + 1 or 1
+		start = to and to + 1 or 1
 		do	from, to, alt = str_find(key, "^(r?alt)", start)
 		end
 		if	alt == "alt"
 		then	alt = "lalt"
-		else	from, to, alt = str_find(key, "^(l?alt)", start)
+		elseif	alt ~="ralt"
+		then	from, to, alt = str_find(key, "^(l?alt)", start)
 		end
 		start = to and to + 1 or start
 		key = (ctrl or "")..(alt or "")..str_sub(key, start)
