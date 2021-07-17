@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "1.10.1.2",
+	version_mod	= "2.0.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -145,7 +145,6 @@ local tbl_normal_ask__load = loadfile(own_fpath..".dat")
 local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
 local flg_ext_mod_off	-- to disable handler in order to run an original macro
 local vkc_no_repeat
-local tbl_key_lev
 
 local function fnc_err_msg(msg, ...)
 	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
@@ -226,9 +225,10 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 	do	for jj_mcr_id, jj_mcr_obj in pairs(ii_obj_coll.scripts)
 		do	local	jj_mcr_item = tbl_res[jj_mcr_id]
 			if	jj_mcr_item
-			then	jj_mcr_item.keys_full[#jj_mcr_item.keys_full + 1] = ii_key_full
+			then	jj_mcr_item.keys_full[ii_key_full] = ii_obj_coll.key_pth2
 			else	jj_mcr_item = {
-					keys_full = { [ii_key_full] = ii_obj_coll.key_path },
+					keys_full = {[ii_key_full] = ii_obj_coll.key_pth2 },
+					mcr_extid = jj_mcr_id,
 					obj_macro = jj_mcr_obj,
 					key_final = ii_obj_coll.key_final,
 					key_level = ii_obj_coll.key_level,
@@ -240,49 +240,6 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 		end
 	end
 	return tbl_res
-end
-
-local function fnc_get_seq_hlp(key_scr, in_key_base)
-	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
-	local	tbl_hlp = { }
-	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
-	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
-		do	if not	ii_mcr_item.key_extn
-			or not	in_key_base
-			then	tbl_insert(tbl_hlp, fnc_key_prettify(jj_key_full).." - "..ii_mcr_item.obj_macro.description)
-			end
-		end
-	end
-	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress Escape to cancel the sequence" or false
-end -- fnc_get_seq_hlp
-
-local function fnc_get_fin_scp(key_scr)
-	local	tbl_fin = { }
-	if	key_scr
-	then	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
-		for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
-		do	for	jj_key_idx, jj_key_full in pairs(ii_mcr_item.keys_full)
-			do	if	ii_mcr_item.key_final
-				then	tbl_insert(tbl_fin, ii_mcr_item)
-				end
-			end
-		end
-	end
-	return tbl_fin
-end -- fnc_get_fin_scp
-
-
-local function runMacro(key, ext)
-	local	eval_res = eval(key..(ext and ext or ""), 2)
-	return	eval_res ~= EVAL_MACRONOTFOUND, eval_res
-end
-
-local function runMacroOrKey(key)
-	local	eval_res = eval(key, 2)
-	if	eval_res == EVAL_MACRONOTFOUND
-	then	Keys(key)
-	end
-	return	eval_res
 end
 
 local rgx_key_parse = regex.new("/^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$/i")
@@ -365,8 +322,181 @@ local function fnc_key_equal(key_base, key_comp)
 	return false
 end -- fnc_key_equal
 
+local function fnc_get_seq_hlp(key_scr, in_key_base, cond_prio_curr, tbl_key_seq)
+	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
+	local	tbl_hlp = { }
+	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
+	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
+		do	if	cond_prio_curr[ii_mcr_idx]
+			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
+			and(not	ii_mcr_item.key_extn
+			or not	in_key_base)
+			then	--[[ to get rid of wrong keys in the help,
+				like in "CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
+				need to make comparing sequences and use it in help ]]
+				local	is_equal = true
+				for ii_seq_pos, ii_seq_key in pairs(tbl_key_seq)
+				do	if not	fnc_key_equal(ii_seq_key.exp, jj_key_path[ii_seq_pos].exp)
+					or	ii_seq_key.ext ~= jj_key_path[ii_seq_pos].ext
+					then	is_equal = false
+						break
+					end
+				end
+				if	is_equal
+				then	tbl_insert(tbl_hlp, fnc_key_prettify(jj_key_full).." - "..ii_mcr_item.obj_macro.description)
+				end
+			end
+		end
+	end
+	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress Escape to cancel the sequence" or false
+end -- fnc_get_seq_hlp
+
+local function fnc_get_fin_scp(key_scr)
+	local	tbl_fin = { }
+	if not	key_scr
+	then	return tbl_fin
+	end
+	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
+	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
+	do	for	jj_key_idx, jj_key_full in pairs(ii_mcr_item.keys_full)
+		do	if	ii_mcr_item.key_final
+			then	tbl_insert(tbl_fin, ii_mcr_item)
+			end
+		end
+	end
+	return tbl_fin
+end -- fnc_get_fin_scp
+
+local function GetMacro(argKey, argUseCommon)
+	local area_name = str_lower(Area.Current)
+	local Area_Names = { area_name, argUseCommon and area_name ~= "common" and "common" or nil }
+	local key = argKey:lower()
+	do 
+		local	from, to, ctrl, alt
+		do	from, to, ctrl = str_find(key, "^(r?ctrl)")
+		end
+		if	ctrl == "ctrl"
+		then	ctrl = "lctrl"
+		else 	from, to, ctrl = str_find(key, "^(l?ctrl)")
+		end
+		local	start = to and to + 1 or 1
+		do	from, to, alt = str_find(key, "^(r?alt)", start)
+		end
+		if	alt == "alt"
+		then	alt = "lalt"
+		else	from, to, alt = str_find(key, "^(l?alt)", start)
+		end
+		start = to and to + 1 or start
+		key = (ctrl or "")..(alt or "")..str_sub(key, start)
+	end
+	--[[ Create collector table: keys are macros, values are indexes into CInfo.
+	For each macro, CInfo stores 2 consecutive values: dynamic priority and found area.]]
+	local Collector, CInfo = { }, { }
+	-- Filter macros by filemask and flags. Put the "successful" ones in the collector.
+	local filename = false
+		or area_name == "editor" and editor.GetFileName()
+		or area_name == "viewer" and viewer.GetFileName()
+		or area_name == "shell"  and APanel.Path.."\\"..APanel.Current
+
+	local function ExamineMacro(m, area_name)
+		local check = not (filename and m.filemask)
+			or far.ProcessName("PN_CMPNAMELIST", m.filemask, filename, "PN_SKIPPATH")
+		if	check 
+		then	if not	Collector[m]
+			then	local n = #CInfo + 1
+				Collector[m] = n
+				CInfo[n] = m.priority or 50
+				CInfo[n + 1] = area_name
+			end
+		end
+	end -- ExamineMacro
+
+	for _, ii_areaname in ipairs(Area_Names)
+	do	local	ii_areatable = Xer0X.utils.Areas[ii_areaname]
+		if	ii_areatable
+		then	local	ii_macros = ii_areatable[key]
+			if	ii_macros
+			then	for _, jj_m in ipairs(ii_macros)
+				do	if not	jj_m.disabled
+					then
+						ExamineMacro(jj_m, ii_areaname)
+					end
+				end
+			end
+		end
+	end
+	local max_priority = -1
+	local nummacros = 0
+	for ii_m, ii_p in pairs(Collector)
+	do	if	ii_m.condition
+		then	local	ii_pr = ii_m.condition(key, ii_m.data) -- unprotected call
+			if	ii_pr
+			then	if type(ii_pr) == "number"
+				then CInfo[ii_p] = ii_pr > 100 and 100 or ii_pr < 0 and 0 or ii_pr
+				end
+			else	Collector[ii_m] = nil
+			end
+		end
+		if	Collector[ii_m]
+		then	nummacros = nummacros + 1
+			if	max_priority < CInfo[ii_p]
+			then	max_priority = CInfo[ii_p]
+			end
+		end
+	end
+	local macrolist = { }
+	local nindex = nil
+	for ii_m, ii_p in pairs(Collector)
+	do	macrolist[#macrolist + 1] = { macro = ii_m, priority = CInfo[ii_p] }
+		if CInfo[ii_p] == max_priority then nindex = nindex and -1 or #macrolist end
+	end
+	return macrolist, nindex, Collector, CInfo
+end -- GetMacro
+
+local function fnc_macro_key_check(key_scr)
+	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
+	local	tbl_mcr_key_ok = { }
+	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
+	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
+		do	
+			local mcr_list, mcr_hi_idx = GetMacro(jj_key_full, true)
+			for jj_mcr_idx, jj_mcr_obj in pairs(mcr_list)
+			do	local	jj_mcr_itm = tbl_mcr_key_ok[jj_mcr_obj.macro.data.id_ext]
+				if not	jj_mcr_itm
+				then	jj_mcr_itm = { }
+				end
+				if not	jj_mcr_itm[jj_key_full]
+				then    jj_mcr_itm[jj_key_full] = {
+						priority = jj_mcr_obj.priority,
+						is_highest = jj_mcr_idx == mcr_hi_idx
+					}
+				end
+				jj_mcr_itm.highest = mcr_def_idx
+				tbl_mcr_key_ok[jj_mcr_obj.macro.data.id_ext] = jj_mcr_itm
+			end
+		end
+	end
+	return tbl_mcr_key_ok
+end -- fnc_macro_key_check
+
+
+local function runMacro(key, ext)
+	local	eval_res = eval(key..(ext and ext or ""), 2)
+	return	eval_res ~= EVAL_MACRONOTFOUND, eval_res
+end
+
+local function runMacroOrKey(key)
+	local	eval_res = eval(key, 2)
+	if	eval_res == EVAL_MACRONOTFOUND
+	then	Keys(key)
+	end
+	return	eval_res
+end
+
 local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
-	return not flg_ext_mod_off and (obj_handler.priority or true)
+	if flg_ext_mod_off then return false end
+	obj_handler.prio_curr = fnc_macro_key_check(obj_handler.key_ext.SCP, false)
+	if next(obj_handler.prio_curr) then return 0 end
 end -- fnc_hnd_mcr_condition
 
 local obj_waitkeys = {
@@ -405,9 +535,16 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),  
 		key_ext = obj_handler.key_ext,				
 		key_rec = far_NameToInputRecord(key_str_bas),		
+		key_exp = { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
 		key_time= Far.UpTime,					
 	}
-	tbl_key_lev = { obj_key_lev } -- init
+	local tbl_key_lev = { obj_key_lev } -- init
+	local obj_key_cur = {
+		exp = obj_key_lev.key_exp,
+		bas = str_lower(obj_key_lev.key_str_bas),
+		key = str_lower(obj_key_lev.key_str_bas),
+	}
+	local tbl_key_seq = { obj_key_cur }
 	local key_ext	= obj_key_lev.key_ext
 	local key_rec	= obj_key_lev.key_rec
 	local t_last_key= obj_key_lev.key_time
@@ -433,7 +570,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..tbl_ext_mode_show[obj_key_lev.ext_type]
 			obj_key_lev.key_bas		= obj_key_lev.key_ext 
 			obj_key_lev.key_ext		= obj_key_lev.key_ext[obj_key_lev.ext_type]
-			key_ext_new = obj_key_lev.key_ext 
+			obj_key_cur.ext			= str_ext 
+			obj_key_cur.key			= str_lower(obj_key_cur.key..tbl_ext_mode_show[str_ext])
+			key_ext_new			= obj_key_lev.key_ext 
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
@@ -469,6 +608,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				key_rec_pre =	key_rec,
 				key_rec =	key_rec_new,
 				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(key_str_new, "-", "Minus"),
+				key_exp =	key_exp_try,
 				key_time=	t_wait_key,
 			}
 			obj_key_lev = obj_key_lev.next_key_lev
@@ -479,16 +619,24 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			key_rec		= obj_key_lev.key_rec
 			key_str_bas	= obj_key_lev.key_str_bas 
 			vkc_no_repeat	= obj_key_lev.key_rec.VirtualKeyCode -- prevent autorepeat
+			obj_key_cur = {
+				exp = obj_key_lev.key_exp,
+				bas = obj_key_lev.key_str_bas,
+				key = obj_key_lev.key_str_bas,
+			}
+			tbl_key_seq[#tbl_key_seq + 1] = obj_key_cur
 		else -- no SEQ/HLD/DBL
-			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
-			then	far_Message(
-					fnc_get_seq_hlp(
-						obj_key_lev.key_ext.SCP, 
-						obj_key_lev.key_ext.KXP -- here KXP is the flag that we are not in an extended key
-					),
-					obj_key_lev.key_str_seq, 
-					"", "l"
-				)
+			if OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
+			then far_Message(
+				fnc_get_seq_hlp(
+					obj_key_lev.key_ext.SCP	,
+					obj_key_lev.key_ext.KXP	, -- here KXP is the flag that we are not in an extended key
+					obj_handler.prio_curr	,
+					tbl_key_seq
+				),
+				obj_key_lev.key_str_seq,
+				"", "l"
+					)
 			end
 		end
 		if	str_ext
@@ -526,11 +674,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				str_format(
 					"%s\n\1\nDo you want to run these keys as normal in %s?\n\1\n%s\n\2",
 					bad_key_seq, Area.Current, tbl_concat(obj_waitkeys.keys, ", ")
-						),
+				),
 				"WRONG SEQUENCE",
 				"&YES;yes &Save;&NOT;not sav&E",
 				"w"
-					)
+			)
 		end
 		if	res_msg == 2
 		or	res_msg == 4
@@ -616,8 +764,16 @@ local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
 		}
 		tbl_handlers[key_area][m_key] = obj_handler
 	end
-	obj_handler.priority = math_max(obj_handler.priority or 0, (obj_mcr.priority or 50) + 5)
-	obj_handler.key_ext = fnc_tbl_copy_to(obj_key_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
+	fnc_tbl_copy_to(obj_key_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
+	if	key_area == "common"
+	then	for ii_area_name, ii_area_handlers in pairs(tbl_handlers)
+		do 	if	ii_area_name ~= "common"
+			and	ii_area_handlers[m_key]
+			then	fnc_tbl_copy_to(ii_area_handlers[m_key].key_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
+				ii_area_handlers[m_key] = nil
+			end
+		end
+	end
 	return obj_handler
 end -- fnc_key_handler_set
 
@@ -630,6 +786,8 @@ local function fnc_macro_ex_create(tbl_handlers)
 			priority	= ii_area_key_handler.priority,
 			action		= ii_area_key_handler.fnc_action,
 			condition	= ii_area_key_handler.fnc_condition,
+			priority	= 0, 
+			sortpriority	= 0, 
 			ext_key_hnd	= ii_area_key_handler,
 			FileName	= own_fpath,
 		}
@@ -719,12 +877,27 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			if not	obj_mcr.data.key_seq_all[ii_key]
 			then	obj_mcr.data.key_seq_all[ii_key] = tbl_kxp_ii -- is better than tbl_key_ii
 			end
-			for kk, kk_area in pairs(fnc_str_split(str_lower(obj_mcr.area), "%s+", true))
-			do	if not	tbl_handlers_loc[kk_area]
-				then	tbl_handlers_loc[kk_area] = { }
-				end
-				for ll_ext_key, ll_ext_obj in pairs(tbl_ext)
-				do	tbl_handlers_loc[kk_area][ll_ext_key] = fnc_key_handler_set(kk_area, ll_ext_obj, obj_mcr)
+			obj_mcr.data.areas_arr = fnc_str_split(str_lower(obj_mcr.area), "%s+", true)
+			obj_mcr.data.areas_dict = { }
+			for kk, kk_area in pairs(obj_mcr.data.areas_arr)
+			do obj_mcr.data.areas_dict[kk_area] = kk
+			end
+			local tbl_work_areas = obj_mcr.data.areas_arr
+			if obj_mcr.data.areas_dict.common
+			then tbl_work_areas = { "common" }
+			end
+			for kk_ext_key, kk_ext_obj in pairs(tbl_ext)
+			do 
+				for ll, ll_area in pairs(tbl_work_areas)
+				do	if	ll_area ~= "common"
+					and	tbl_handlers.common
+					and	tbl_handlers.common[kk_ext_obj.KXP.str]
+					then	ll_area = "common"
+					end
+					if not	tbl_handlers_loc[ll_area]
+					then	tbl_handlers_loc[ll_area] = { }
+					end
+					tbl_handlers_loc[ll_area][kk_ext_key] = fnc_key_handler_set(ll_area, kk_ext_obj, obj_mcr)
 				end
 			end
 		end
