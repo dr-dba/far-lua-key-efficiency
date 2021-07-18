@@ -33,7 +33,7 @@ local nfo = Info({
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
 	url_mod		= "http://forum.farmanager.com/viewtopic.php?f=15&t=12459",
-	url_git		= "http://github.com/dr-dba/far-lua-key-efficiency",
+	url_git		= "https://github.com/dr-dba/far-lua-key-efficiency",
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion	= { 3, 0, 0, 4430, 0 },
 	options		= {
