@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.3.0",
+	version_mod	= "2.3.0.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -561,7 +561,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		bas = str_lower(obj_key_lev.key_str_bas),
 		key = str_lower(obj_key_lev.key_str_bas),
 	}
-	local tbl_key_seq = { obj_key_cur }
+	local tbl_key_seq = { obj_key_cur } -- init
 	local key_ext	= obj_key_lev.key_ext
 	local key_rec	= obj_key_lev.key_rec
 	local t_last_key= obj_key_lev.key_time
@@ -603,7 +603,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					band(key_rec	.ControlKeyState, MOD_MASK)
 			if not	cas_mod_is_same
 			and	BREAK_SEQ_ON_MOD_RELEASE
-			then	break
+			then	break -- run normal
 			end
 			local	key_str_try = key_str_new
 			local	plain_tried, same_cas_tried, key_rec_try
@@ -698,10 +698,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			end
 		end
 		if	fnc_is_cas_mod_rls(obj_key_lev.key_rec)
-		and	BREAK_SEQ_ON_MOD_RELEASE
-		or  not obj_key_lev.key_ext.SEQ
-		and not obj_key_lev.key_ext.EXT
-		then	break
+		and	BREAK_SEQ_ON_MOD_RELEASE-- CAS changed when should not
+		or  not obj_key_lev.key_ext.SEQ	-- no sequences
+		and not obj_key_lev.key_ext.EXT -- no extensions to wait
+		then	break -- run normal, either lost sequence, or CAS changed when should not
 		end
 	until false
 	tbl_key_lev.run_mode = run_mode -- debug purposes only
