@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.4",
+	version_mod	= "0.7.5",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -63,7 +63,6 @@ for ii, ii_key in ipairs({
 	"LCtrlMinus-Minus",		-- LCtrl-,then -
 --	"LCtrl--",			-- LCtrl, then -
 	"LCtrl-Minus",			-- LCtrl, then -
---	"RCtrl---F2",			-- RCtrl, then -, then F2
 	"RCtrl-Minus-F2",		-- RCtrl, then -, then F2
 --	"RCtrl----F1",			-- RCtrl-,then -, then F1
 	"RCtrlMinus-Minus-F1",		-- RCtrl-,then -, then F1
@@ -85,16 +84,21 @@ for ii, ii_key in ipairs({
 	"::Double",
 	-- error
 --	"qwerty-0",
-	"CtrlAltS:Hold",
-	"CtrlAltS:Double",
+--	"CtrlAltS:Hold",
+--	"CtrlAltS:Double",
+	"CtrlAltX-Y-Z",
 	"RCtrlRAltS:Double",
 	"LCtrlLAltS-RCtrlRAltO-CtrlAltX",
 	"LCtrlAlt-RCtrlAlt",
+	"CtrlAlt-CtrlAlt",
 	"CtrlRAlt-LCtrlRAlt-F8",
 	"CtrlLAlt:Hold",
+	"CtrlAlt:Hold",
 	"CtrlRAlt:Hold-F3-F2-F1",
 	"RCtrlRAlt:Double",
+	"CtrlAlt:Double",
 	"RCtrlAlt-Alt",
+	"CtrlAlt-Alt",
 	"LCtrlRAlt-Alt",
 	"LCtrlRAlt-F7-F6-F5",
 	"CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
@@ -112,6 +116,7 @@ do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 		area = "Editor Shell",
 		disabled = true,
 		key = ii_key,
+	--	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
 	}
 end
@@ -147,5 +152,3 @@ Macro {	description = "CtrlF9-AltF9 (Viewer+Editor+Common) MacroEx example",
 }
 
 -- @@@@@
-
-
