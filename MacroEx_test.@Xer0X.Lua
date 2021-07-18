@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.6",
+	version_mod	= "0.7.7",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -116,7 +116,6 @@ do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 		area = "Editor Shell",
 		disabled = true,
 		key = ii_key,
-		priority = ii, 
 		sortpriority = ii % 5;
 	--	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
