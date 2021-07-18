@@ -28,11 +28,11 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.3.0.1",
+	version_mod	= "2.4.0",
 	author		= "JD",
 	author_mod	= "x-Team",
-	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
-	url_mod		= "http://forum.farmanager.com/viewtopic.php?f=15&t=12459",
+	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
+	url_mod		= "https://forum.farmanager.com/viewtopic.php?f=15&t=12459",
 	url_git		= "https://github.com/dr-dba/far-lua-key-efficiency",
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion	= { 3, 0, 0, 4430, 0 },
@@ -175,10 +175,9 @@ end -- fnc_combo_mod_try
 
 local tbl_key_rec_cache = { } -- micro optimization
 local far_NameToInputRecord = function(the_key)
-	local	the_key_low = str_lower(the_key)
-	local	the_key_rec = tbl_key_rec_cache[the_key_low]
+	local	the_key_rec = tbl_key_rec_cache[the_key]
 	if	the_key_rec
-	then	return the_key_rec	 
+	then	return the_key_rec
 	end
 	--[[ FarNameToInputRecord: "CtrlNumLock"-->VK_PAUSE
 	http://bugs.farmanager.com/view.php?id=2947
@@ -192,7 +191,7 @@ local far_NameToInputRecord = function(the_key)
 	then    if OPT_DEBUG
 		then fnc_err_msg(str_format("Unexpected AKey: %q", the_key))
 		end
-	else	tbl_key_rec_cache[the_key_low] = key_inp_rec
+	else	tbl_key_rec_cache[the_key] = key_inp_rec
 	end
 	return key_inp_rec
 end
@@ -220,10 +219,13 @@ Event {	description = "MacroEx helper",
 
 -- State after last mf.waitkey!!
 local function fnc_is_cas_mod_rls(key_rec)
-	return	0 == band(
-		band(Mouse.LastCtrlState,	MOD_MASK), 
-		band(key_rec.ControlKeyState,	MOD_MASK)
-			)
+	local mouse_cas = band(Mouse.LastCtrlState,	MOD_MASK)
+	local input_cas = band(key_rec.ControlKeyState,	MOD_MASK)
+	return	0 == band(mouse_cas, input_cas)
+		and (	0 ~= mouse_cas or
+			0 ~= input_cas
+		),
+		mouse_cas
 end
 
 local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
@@ -493,15 +495,32 @@ local function fnc_macro_key_check(key_scr)
 end -- fnc_macro_key_check
 
 
+
+local function fnc_cas_int_to_str(cas_mod, empty_str)
+	local ret_val =	""
+		..(band(cas_mod, LEFT_CTRL_PRESSED	) > 0 and "LCtrl" or "")
+		..(band(cas_mod, RIGHT_CTRL_PRESSED	) > 0 and "RCtrl" or "")
+		..(band(cas_mod, LEFT_ALT_PRESSED	) > 0 and "LAlt"  or "")
+		..(band(cas_mod, RIGHT_ALT_PRESSED	) > 0 and "RAlt"  or "")
+		..(band(cas_mod, SHIFT_PRESSED		) > 0 and "Shift" or "")
+	if	ret_val == ""
+	and	empty_str
+	then	return empty_str
+	else	return ret_val
+	end
+end -- fnc_cas_int_to_str
+
+Xer0X.fnc_cas_int_to_str = fnc_cas_int_to_str
+
 local function runMacro(key, ext)
 	local	eval_res = eval(key..(ext and ext or ""), 2)
 	return	eval_res ~= EVAL_MACRONOTFOUND, eval_res
 end
 
-local function runMacroOrKey(key)
-	local	eval_res = eval(key, 2)
+local function runMacroOrKey(the_key)
+	local	eval_res = eval(the_key, 2)
 	if	eval_res == EVAL_MACRONOTFOUND
-	then	Keys(key)
+	then	Keys(the_key)
 	end
 	return	eval_res
 end
@@ -539,14 +558,14 @@ end
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local obj_scr = far.SaveScreen()
-	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, t_wait_key
+	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, is_cas_mod_rls, cas_int_new, t_wait_key
 	local run_mode = "ask_normal" -- default mode
 	local key_str_bas = akey(1, 0) 
 	local obj_key_lev = {
 		key_str_act	= key_str_bas,				
 		key_str_bas	= key_str_bas,				
 		key_str_bas_ext = key_str_bas,				
-		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),  
+		key_str_seq	= str_gsub(fnc_key_prettify(key_str_bas), "-", "Minus"),
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
 		key_ext		= obj_handler.key_ext,				
@@ -579,7 +598,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		--[[ double key need to be double pressed in the time frame lesser than OPT_DELAY_EXT,
 		to differentiate it from subsequent presses of the same key,
 		as for example to differentiate "CtrlF9:Double" and "CtrlF9-CtrlF9" ]]
-		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and not is_ext_timeout and fnc_key_equal(key_str_new, obj_key_lev.key_str_bas)
+		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and not is_ext_timeout
+			and (	fnc_key_equal(key_str_new, obj_key_lev.key_str_act)
+			or	fnc_key_equal(key_str_new, obj_key_lev.key_str_bas))
 		local	str_ext =
 				was_hld and key_ext.HLD and "HLD" or
 				was_dbl and key_ext.DBL and "DBL"
@@ -606,7 +627,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			then	break -- run normal
 			end
 			local	key_str_try = key_str_new
-			local	plain_tried, same_cas_tried, key_rec_try
+			local	plain_tried, same_cas_tried
 			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, "in_lower", "real_key_str", "received")
 			::seq_key_try::
 			local	key_rec_try = far_NameToInputRecord(key_str_try) -- real
@@ -619,7 +640,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			and	cas_mod_is_same --]]
 			-- KXP.key as "plain" key cant be used here, since it is NEW key
 			and	key_obj_try.plain -- false in the kind of RCtrlAlt
-			and	str_lower(key_str_try) ~= key_obj_try.plain
+			and	str_lower(key_str_try) ~= str_lower(key_obj_try.plain)
 			then	key_str_try = key_obj_try.plain
 				plain_tried = true
 				goto seq_key_try
@@ -630,18 +651,19 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			and	obj_key_lev.key_str_cas ~= ""		-- current key CAS need to be
 			and (	plain_tried				-- means plain already tried unsuccessfully
 			or	({next(key_exp_try)})[2].cas == "")	-- .. or is a plain key anyway
-		--	and	({next(key_exp_new)})[2].cas == "" --[[ do it only if the original new key without CAS, 
+		--	and	({next(key_exp_new)})[2].cas == "" --[[ do it only if the original new key without CAS,
 			and (	band(key_rec_new.ControlKeyState, key_rec.ControlKeyState, MOD_MASK) > 0
 			-- says CAS keys can be released, but not with new CAS keys pressed:
 			and	band(key_rec_new.ControlKeyState, MOD_MASK) < band(key_rec.ControlKeyState, MOD_MASK)
 			or	({next(key_exp_new)})[2].cas == "")
 			then	-- try with the same CAS mods as the previous key:
-				key_str_try = obj_key_lev.key_str_cas_rec..key_str_try
+				key_str_try = fnc_key_prettify(obj_key_lev.key_str_cas_rec..key_str_try)
 				same_cas_tried = true
 				goto seq_key_try
 			end
 			if not	key_str_seq -- ? is it registered sequence key
-			then	break -- run normal
+			then	local abc = 111
+				break -- run normal
 			end
 			obj_key_lev.next_type = "SEQ"
 			obj_key_lev.next_key_str = key_str_try
@@ -655,7 +677,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				key_ext =	key_obj_seq,
 				key_rec_pre =	key_rec,
 				key_rec =	key_rec_try,
-				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(key_str_try, "-", "Minus"),
+				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(fnc_key_prettify(key_str_try), "-", "Minus"),
 				key_exp =	key_exp_try,
 				key_time=	t_wait_key,
 			}
@@ -664,9 +686,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			str_ext		= "SEQ"
 			key_ext_new	= obj_key_lev.key_ext
 			key_rec_pre	= obj_key_lev.key_rec_pre
-			key_rec		= obj_key_lev.key_rec
+			key_rec		= obj_key_lev.key_rec_act
 			key_str_bas	= obj_key_lev.key_str_bas 
-			vkc_no_repeat	= obj_key_lev.key_rec.VirtualKeyCode -- prevent autorepeat
+			vkc_no_repeat	= obj_key_lev.key_rec_act.VirtualKeyCode -- prevent autorepeat
 			obj_key_cur = {
 				exp = obj_key_lev.key_exp,
 				bas = obj_key_lev.key_str_bas,
@@ -676,11 +698,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		else -- no SEQ/HLD/DBL
 			if OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
 			then far_Message(
-				fnc_get_seq_hlp(
-					obj_key_lev.key_ext.SCP	,
-					obj_handler.prio_curr	,
-					tbl_key_seq
-				),
+				fnc_get_seq_hlp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq),
 				obj_key_lev.key_str_seq,
 				"", "l"
 					)
@@ -697,19 +715,30 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				break
 			end
 		end
-		if	fnc_is_cas_mod_rls(obj_key_lev.key_rec)
+		is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
+		if	is_cas_mod_rls 
 		and	BREAK_SEQ_ON_MOD_RELEASE-- CAS changed when should not
-		or  not obj_key_lev.key_ext.SEQ	-- no sequences
+		then	tbl_key_lev.is_cas_mod_rls = is_cas_mod_rls
+			tbl_key_lev.cas_mod_int_rls= cas_int_new
+			break -- run normal
+		end
+		if  not obj_key_lev.key_ext.SEQ	-- no sequences
 		and not obj_key_lev.key_ext.EXT -- no extensions to wait
-		then	break -- run normal, either lost sequence, or CAS changed when should not
+		then	break -- run normal, is lost sequence
 		end
 	until false
-	tbl_key_lev.run_mode = run_mode -- debug purposes only
-	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev
+	vkc_no_repeat = false
+	tbl_key_lev.run_mode = run_mode
 	far.RestoreScreen(obj_scr)
 	if	run_mode == "ask_normal"
 	then
-		local	bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq, key_str_new and key_str_new ~= "" and key_str_new or "???")
+		local	bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq,
+				key_str_new and key_str_new ~= "" and key_str_new
+				or is_cas_mod_rls and "[CAS mode chg.:] "
+					..fnc_cas_int_to_str(obj_key_lev.key_rec_act.ControlKeyState, "<none>")
+					.." ==>> "
+					..fnc_cas_int_to_str(cas_int_new, "<none>")
+				or "???")
 		if not	tbl_normal_ask[Area.Current]
 		then	tbl_normal_ask[Area.Current] = { }
 		end
@@ -740,7 +769,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then	obj_status:set(str_format("%s anassigned run normal%s", bad_key_seq, res_msg == 2 and " (saved)" or ""), nil, 2500)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
-			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
+			do	local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 			end
 			flg_ext_mod_off = false
 		else	obj_status:set(str_format("%s anassigned run cancel%s", bad_key_seq, res_msg == 4 and " (saved)" or ""), nil, 2500)
@@ -764,6 +793,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	then
 		obj_status:set(str_format("%s sequence canceled", obj_key_lev.key_str_seq), nil, 3000)
 	end
+	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev -- debug purposes only
 end -- fnc_hnd_mcr_action
 
 local function fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
