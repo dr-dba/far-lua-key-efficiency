@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.2.0",
+	version_mod	= "2.3.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -887,22 +887,14 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				end
 				local tbl_key_exp_jj = fnc_key_expand(jj_key_base, true, true)
 				tbl_kxp_ii[#tbl_kxp_ii + 1] = { exp = tbl_key_exp_jj, bas = jj_key_base, ext = jj_ext_mode, key = jj_key_seq }
-
-				local function fnc_loc_scr_key_gen(is_fin_key) 
-				-- helper func, not done with usual table, only because we need to differentiate "is_fin_key"
-					return { [ii_key] = {
-						key_level= jj,
-						key_path = tbl_key_ii,
-						key_pth2 = tbl_kxp_ii,
-						key_full = ii_key,
-						key_extn = jj_ext_mode,
-						key_base = jj_key_base,
-						key_expn = tbl_key_exp_jj,
-						scripts = { [obj_mcr.data.id_ext] = obj_mcr }
-				} } end
-
+				local tbl_scr_key = { [ii_key] = {
+					key_full = ii_key,
+					key_path = tbl_key_ii,
+					key_pth2 = tbl_kxp_ii,
+					scripts = { [obj_mcr.data.id_ext] = obj_mcr }
+				} }
 				local tbl_seq_stub = { }
-				local tbl_ext_stub = jj_ext_mode and { EXT = jj_ext_mode, SCP = fnc_loc_scr_key_gen(jj == #tbl_key_ii) }
+				local tbl_ext_stub = jj_ext_mode and { EXT = jj_ext_mode, SCP = tbl_scr_key }
 				if	jj_ext_mode
 				and	ALLOW_SEQ_IN_EXT
 				then	tbl_ext_stub.SEQ = tbl_seq_stub
@@ -913,7 +905,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 					then	tbl_ext_jj[kk_str][jj_ext_mode] = tbl_ext_stub
 					else	tbl_ext_jj[kk_str].SEQ = tbl_seq_stub
 					end
-					tbl_ext_jj[kk_str].SCP = fnc_loc_scr_key_gen(jj == #tbl_key_ii and not jj_ext_mode)
+					tbl_ext_jj[kk_str].SCP = tbl_scr_key 
 				end
 				tbl_ext_jj = jj_ext_mode and ALLOW_SEQ_IN_EXT and tbl_ext_stub.SEQ or tbl_seq_stub
 			end -- end of the sequence keys processing loop
