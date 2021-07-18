@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.4.1",
+	version_mod	= "2.4.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -327,6 +327,30 @@ local function fnc_key_equal(key_base, key_comp)
 	return false
 end -- fnc_key_equal
 
+local function fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	if type(copy_key_idx) == "number"
+	and	copy_key_idx <= #tbl_from_loc
+	then	tbl_dest_loc[#tbl_dest_loc + 1] = copy_key_val
+	else	tbl_dest_loc[copy_key_idx]	= copy_key_val
+	end
+	return true
+end
+
+local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	if	copy_key_val.action
+	and	copy_key_val.key
+	and	copy_key_val.area
+	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
+	elseif	copy_key_idx == "KXP"
+	or	copy_key_idx == "key_path"
+	or	copy_key_idx == "key_pth2"
+	then	if not	tbl_dest_loc[copy_key_idx]
+		then	tbl_dest_loc[copy_key_idx] = copy_key_val
+		end
+		return true
+	end
+end
+
 local function fnc_get_seq_hlp(key_scr, cond_prio_curr, tbl_key_seq)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
 	local	tbl_hlp = { }
@@ -465,20 +489,23 @@ local function GetMacro(argKey, argUseCommon)
 	do	macrolist[#macrolist + 1] = { macro = ii_m, priority = CInfo[ii_p] }
 		if CInfo[ii_p] == max_priority then nindex = nindex and -1 or #macrolist end
 	end
+	table.sort(macrolist, function(m1, m2) return Collector[m1.macro] < Collector[m2.macro] end)
 	return macrolist, nindex, Collector, CInfo
 end -- GetMacro
 
 local function fnc_macro_key_check(key_scr)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
 	local	tbl_mcr_key_ok = { }
+	local	macrolist = { }
 	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
 	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
 		do	
-			local mcr_list, mcr_hi_idx = GetMacro(jj_key_full, true)
-			for jj_mcr_idx, jj_mcr_obj in pairs(mcr_list)
+			local jj_mcr_list, mcr_hi_idx = GetMacro(jj_key_full, true)
+			for jj_mcr_idx, jj_mcr_obj in pairs(jj_mcr_list)
 			do	local	jj_mcr_itm = tbl_mcr_key_ok[jj_mcr_obj.macro.data.id_ext]
 				if not	jj_mcr_itm
 				then	jj_mcr_itm = { }
+					macrolist[#macrolist + 1] = jj_mcr_obj
 				end
 				if not	jj_mcr_itm[jj_key_full]
 				then    jj_mcr_itm[jj_key_full] = {
@@ -491,7 +518,10 @@ local function fnc_macro_key_check(key_scr)
 			end
 		end
 	end
-	return tbl_mcr_key_ok
+	table.sort(macrolist, function(m1, m2) return 
+		(m1.priority	or 0)	> (m2.priority	or	0) or 
+		(m1.sortpriority or 0)	> (m2.sortpriority or	0) end)
+	return tbl_mcr_key_ok, macrolist
 end -- fnc_macro_key_check
 
 
@@ -790,6 +820,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			local scr_num, scr_obj = next(fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq))
 			eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
+			--[[ TODO: upon unsuccess when macro not found especiallly,
+			probably we should suggest ask for running rormal? ]]
 		end
 		obj_status:set(str_format("%s Run %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
 	elseif
@@ -799,30 +831,6 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	end
 	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev -- debug purposes only
 end -- fnc_hnd_mcr_action
-
-local function fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
-	if type(copy_key_idx) == "number"
-	and	copy_key_idx <= #tbl_from_loc
-	then	tbl_dest_loc[#tbl_dest_loc + 1] = copy_key_val
-	else	tbl_dest_loc[copy_key_idx]	= copy_key_val
-	end
-	return true
-end
-
-local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
-	if	copy_key_val.action
-	and	copy_key_val.key
-	and	copy_key_val.area
-	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
-	elseif	copy_key_idx == "KXP"
-	or	copy_key_idx == "key_path"
-	or	copy_key_idx == "key_pth2"
-	then	if not	tbl_dest_loc[copy_key_idx]
-		then	tbl_dest_loc[copy_key_idx] = copy_key_val
-		end
-		return true
-	end
-end
 
 -- register hotkey's handler, here keys and areas should be already normalized to lower case
 local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
