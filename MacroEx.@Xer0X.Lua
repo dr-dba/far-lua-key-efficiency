@@ -28,12 +28,12 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.0.2",
+	version_mod	= "2.1.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
 	url_mod		= "http://forum.farmanager.com/viewtopic.php?f=15&t=12459",
-	url_git		= "https://github.com/dr-dba/far-lua-key-efficiency",
+	url_git		= "http://github.com/dr-dba/far-lua-key-efficiency",
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion	= { 3, 0, 0, 4430, 0 },
 	options		= {
@@ -230,7 +230,6 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 					keys_full = {[ii_key_full] = ii_obj_coll.key_pth2 },
 					mcr_extid = jj_mcr_id,
 					obj_macro = jj_mcr_obj,
-					key_final = ii_obj_coll.key_final,
 				}
 				tbl_res[jj_mcr_id] = jj_mcr_item
 			end
@@ -319,19 +318,17 @@ local function fnc_key_equal(key_base, key_comp)
 	return false
 end -- fnc_key_equal
 
-local function fnc_get_seq_hlp(key_scr, in_key_base, cond_prio_curr, tbl_key_seq)
+local function fnc_get_seq_hlp(key_scr, cond_prio_curr, tbl_key_seq)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
 	local	tbl_hlp = { }
 	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
 	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
 		do	if	cond_prio_curr[ii_mcr_idx]
 			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
-			and(not	jj_key_path[#tbl_key_seq].ext -- current key level
-			or not	in_key_base)
 			then	--[[ to get rid of wrong keys in the help,
 				like in "CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
 				need to make comparing sequences and use it in help ]]
-				local	is_equal = true
+				local	is_equal = true -- lets be optimic
 				for ii_seq_pos, ii_seq_key in pairs(tbl_key_seq)
 				do	if not	fnc_key_equal(ii_seq_key.exp, jj_key_path[ii_seq_pos].exp)
 					or	ii_seq_key.ext ~= jj_key_path[ii_seq_pos].ext
@@ -348,16 +345,26 @@ local function fnc_get_seq_hlp(key_scr, in_key_base, cond_prio_curr, tbl_key_seq
 	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress Escape to cancel the sequence" or false
 end -- fnc_get_seq_hlp
 
-local function fnc_get_fin_scp(key_scr)
+local function fnc_get_fin_scp(key_scr, cond_prio_curr, tbl_key_seq)
 	local	tbl_fin = { }
-	if not	key_scr
-	then	return tbl_fin
-	end
-	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
+	local	tbl_mcr_coll = fnc_macro_collect(key_scr or { })
 	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
-	do	for	jj_key_idx, jj_key_full in pairs(ii_mcr_item.keys_full)
-		do	if	ii_mcr_item.key_final
-			then	tbl_insert(tbl_fin, ii_mcr_item)
+	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
+		do	if	cond_prio_curr[ii_mcr_idx]
+			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
+			then    if	#jj_key_path == #tbl_key_seq
+				then	local	is_equal = true -- lets be optimic
+					for ii_seq_pos, ii_seq_key in pairs(tbl_key_seq)
+					do	if not	fnc_key_equal(ii_seq_key.exp, jj_key_path[ii_seq_pos].exp)
+						or	ii_seq_key.ext ~= jj_key_path[ii_seq_pos].ext
+						then	is_equal = false
+							break
+						end
+					end
+					if	is_equal
+					then	tbl_fin[#tbl_fin + 1] = ii_mcr_item
+					end
+				end
 			end
 		end
 	end
@@ -629,7 +636,6 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			then far_Message(
 				fnc_get_seq_hlp(
 					obj_key_lev.key_ext.SCP	,
-					obj_key_lev.key_ext.KXP	, -- here KXP is the flag that we are not in an extended key
 					obj_handler.prio_curr	,
 					tbl_key_seq
 				),
@@ -644,7 +650,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			key_ext_pre = key_ext	
 			key_ext = key_ext_new	
 			obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
-			if #fnc_get_fin_scp(obj_key_lev.key_ext.SCP) > 0
+			if #fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq) > 0
 			then	run_mode = "seq_ext"
 				break
 			end
