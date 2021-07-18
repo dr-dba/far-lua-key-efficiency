@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.4.2",
+	version_mod	= "2.4.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -486,7 +486,7 @@ local function GetMacro(argKey, argUseCommon)
 	local macrolist = { }
 	local nindex = nil
 	for ii_m, ii_p in pairs(Collector)
-	do	macrolist[#macrolist + 1] = { macro = ii_m, priority = CInfo[ii_p] }
+	do	macrolist[#macrolist + 1] = { macro = ii_m, priority = CInfo[ii_p], sortpriority = ii_m.sortpriority }
 		if CInfo[ii_p] == max_priority then nindex = nindex and -1 or #macrolist end
 	end
 	table.sort(macrolist, function(m1, m2) return Collector[m1.macro] < Collector[m2.macro] end)
@@ -518,9 +518,18 @@ local function fnc_macro_key_check(key_scr)
 			end
 		end
 	end
-	table.sort(macrolist, function(m1, m2) return 
-		(m1.priority	or 0)	> (m2.priority	or	0) or 
-		(m1.sortpriority or 0)	> (m2.sortpriority or	0) end)
+	table.sort(macrolist, function(m1, m2) 
+		local m1_prio = m1.priority	or 0
+		local m2_prio = m2.priority	or 0
+		local m1_sort = m1.sortpriority or 0
+		local m2_sort = m2.sortpriority or 0
+		if	m1_prio >  m2_prio
+		then	return true
+		elseif	m1_prio == m2_prio
+		then	return m1_sort > m2_sort
+		else	return false
+		end
+	end)
 	return tbl_mcr_key_ok, macrolist
 end -- fnc_macro_key_check
 
