@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.1",
+	version_mod	= "0.7.2",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -119,6 +119,7 @@ do	Macro {	description = ii_key.." (Common+Editor) MacroEx example",
 		area	= "Common Editor",
 		key	= ii_key,
 		priority= 100,
+		condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action	= function(mcr_src)
 			far.Message(
 				"You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))),
@@ -133,6 +134,7 @@ Macro {	description = "CtrlF9-AltF9 (Viewer+Editor+Common) MacroEx example",
 	area = "Viewer Editor Common",
 	key = "CtrlF9-AltF9",
 	priority = 100,
+	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description.." ("..Area.Current..")") end
 }
 
