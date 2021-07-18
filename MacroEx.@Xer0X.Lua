@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.1.0",
+	version_mod	= "2.2.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -173,7 +173,13 @@ local function fnc_combo_mod_try(key)
 	end
 end -- fnc_combo_mod_try
 
+local tbl_key_rec_cache = { } -- micro optimization
 local far_NameToInputRecord = function(the_key)
+	local	the_key_low = str_lower(the_key)
+	local	the_key_rec = tbl_key_rec_cache[the_key_low]
+	if	the_key_rec
+	then	return the_key_rec	 
+	end
 	--[[ FarNameToInputRecord: "CtrlNumLock"-->VK_PAUSE
 	http://bugs.farmanager.com/view.php?id=2947
 	http://forum.farmanager.com/viewtopic.php?f=8&t=9357
@@ -186,6 +192,7 @@ local far_NameToInputRecord = function(the_key)
 	then    if OPT_DEBUG
 		then fnc_err_msg(str_format("Unexpected AKey: %q", the_key))
 		end
+	else	tbl_key_rec_cache[the_key_low] = key_inp_rec
 	end
 	return key_inp_rec
 end
@@ -532,17 +539,21 @@ end
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local obj_scr = far.SaveScreen()
-	local key_ext_pre, key_ext_new, key_rec_pre, key_rec_new, key_str_new, t_wait_key
+	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, t_wait_key
 	local run_mode = "ask_normal" -- default mode
 	local key_str_bas = akey(1, 0) 
 	local obj_key_lev = {
+		key_str_act	= key_str_bas,				
 		key_str_bas	= key_str_bas,				
 		key_str_bas_ext = key_str_bas,				
 		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),  
-		key_ext = obj_handler.key_ext,				
-		key_rec = far_NameToInputRecord(key_str_bas),		
-		key_exp = { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
-		key_time= Far.UpTime,					
+		key_str_cas	= obj_handler.key_ext.KXP.cas,
+		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
+		key_ext		= obj_handler.key_ext,				
+		key_rec		= far_NameToInputRecord(key_str_bas),		
+		key_rec_act	= far_NameToInputRecord(key_str_bas),		
+		key_exp		= { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
+		key_time	= Far.UpTime,					
 	}
 	local tbl_key_lev = { obj_key_lev } -- init
 	local obj_key_cur = {
@@ -563,8 +574,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then	run_mode = "cancel"; break
 		end
 		local	is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
-		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and is_ext_timeout and fnc_is_holding(obj_key_lev.key_rec)
-		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and fnc_key_equal(key_str_new, obj_key_lev.key_str_bas)
+		-- holding is considered only after exceeding OPT_DELAY_EXT time frame
+		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and	is_ext_timeout and fnc_is_holding(obj_key_lev.key_rec)
+		--[[ double key need to be double pressed in the time frame lesser than OPT_DELAY_EXT,
+		to differentiate it from subsequent presses of the same key,
+		as for example to differentiate "CtrlF9:Double" and "CtrlF9-CtrlF9" ]]
+		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and not is_ext_timeout and fnc_key_equal(key_str_new, obj_key_lev.key_str_bas)
 		local	str_ext =
 				was_hld and key_ext.HLD and "HLD" or
 				was_dbl and key_ext.DBL and "DBL"
@@ -582,7 +597,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
-			key_rec_new = far_NameToInputRecord(key_str_new) -- real
+			local	key_rec_new = far_NameToInputRecord(key_str_new) -- real
 			local	cas_mod_is_same =
 					band(key_rec_new.ControlKeyState, MOD_MASK) ==
 					band(key_rec	.ControlKeyState, MOD_MASK)
@@ -591,29 +606,56 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			then	break
 			end
 			local	key_str_try = key_str_new
+			local	plain_tried, same_cas_tried, key_rec_try
+			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, "in_lower", "real_key_str", "received")
 			::seq_key_try::
+			local	key_rec_try = far_NameToInputRecord(key_str_try) -- real
 			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, "in_lower", "real_key_str", "received")
 			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
 			if not	key_str_seq
-			and	cas_mod_is_same
+			and not plain_tried
+			--[[ --[=[TODO: to think about, probably we need flag "TRY PLAIN" here?
+				also, probably use +(Plus) as unbreakable CAS mod ]=]
+			and	cas_mod_is_same --]]
 			-- KXP.key as "plain" key cant be used here, since it is NEW key
 			and	key_obj_try.plain -- false in the kind of RCtrlAlt
-			and	key_str_try ~= key_obj_try.plain
-			then	key_str_try  = key_obj_try.plain
+			and	str_lower(key_str_try) ~= key_obj_try.plain
+			then	key_str_try = key_obj_try.plain
+				plain_tried = true
+				goto seq_key_try
+			end
+			if not	key_str_seq	-- self explaining
+			and not same_cas_tried	-- self explaining, isn't it?
+			-- same as above musing, should we invent flag for "TRY NEXT SEQ WITH THE SAME AS PREV CAS" ?
+			and	obj_key_lev.key_str_cas ~= ""		-- current key CAS need to be
+			and (	plain_tried				-- means plain already tried unsuccessfully
+			or	({next(key_exp_try)})[2].cas == "")	-- .. or is a plain key anyway
+		--	and	({next(key_exp_new)})[2].cas == "" --[[ do it only if the original new key without CAS, 
+			and (	band(key_rec_new.ControlKeyState, key_rec.ControlKeyState, MOD_MASK) > 0
+			-- says CAS keys can be released, but not with new CAS keys pressed:
+			and	band(key_rec_new.ControlKeyState, MOD_MASK) < band(key_rec.ControlKeyState, MOD_MASK)
+			or	({next(key_exp_new)})[2].cas == "")
+			then	-- try with the same CAS mods as the previous key:
+				key_str_try = obj_key_lev.key_str_cas_rec..key_str_try
+				same_cas_tried = true
 				goto seq_key_try
 			end
 			if not	key_str_seq -- ? is it registered sequence key
 			then	break -- run normal
 			end
 			obj_key_lev.next_type = "SEQ"
-			obj_key_lev.next_key_str = key_str_new
+			obj_key_lev.next_key_str = key_str_try
 			obj_key_lev.next_key_lev = {
-				key_str_bas =	key_str_new,
+				key_str_act =	key_str_new,
+				key_rec_act =	key_rec_new,
+				key_str_bas =	key_str_try,
+				key_str_cas =	({next(key_exp_try)})[2].cas,
+				key_str_cas_rec=({next(key_exp_try)})[2].rec_cas,
 				key_ext_pre =	key_ext,
 				key_ext =	key_obj_seq,
 				key_rec_pre =	key_rec,
-				key_rec =	key_rec_new,
-				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(key_str_new, "-", "Minus"),
+				key_rec =	key_rec_try,
+				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(key_str_try, "-", "Minus"),
 				key_exp =	key_exp_try,
 				key_time=	t_wait_key,
 			}
@@ -677,8 +719,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		if not  res_msg
 		then	res_msg = far.Message(
 				str_format(
-					"%s\n\1\nDo you want to run these keys as normal in %s?\n\1\n%s\n\2",
-					bad_key_seq, Area.Current, tbl_concat(obj_waitkeys.keys, ", ")
+					"%s\n\1\nDo you want to run these keys as normal for %s area?\n\1\n%s\n\2",
+					bad_key_seq, str_upper(Area.Current), tbl_concat(obj_waitkeys.keys, ", ")
 				),
 				"WRONG SEQUENCE",
 				"&YES;yes &Save;&NOT;not sav&E",
@@ -712,7 +754,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		if not	eval_ok
 		and	eval_res == -2
 		then -- just take the first macro object:
-			local scr_num, scr_obj = next(fnc_get_fin_scp(key_ext.SCP))
+			local scr_num, scr_obj = next(fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq))
 			eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 		end
@@ -856,7 +898,6 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 						key_extn = jj_ext_mode,
 						key_base = jj_key_base,
 						key_expn = tbl_key_exp_jj,
-						key_final= is_fin_key,
 						scripts = { [obj_mcr.data.id_ext] = obj_mcr }
 				} } end
 
