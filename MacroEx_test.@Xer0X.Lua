@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.2",
+	version_mod	= "0.7.4",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -29,6 +29,10 @@ if not nfo then return end
 Macro { description = "test 123",
 	id = win.Uuid(win.Uuid()),
 	area = "Editor",
+--	key = "LCtrlF9 RCtrlF9",
+--	key = "CtrlF9",
+--	key = "LCtrlF9",
+--	key = "RCtrlF9",
 	priority = 100,
 	condition = function(key_rec_str, mcr_data)
 		mcr_data.a_cnt = (mcr_data.a_cnt or 0) + 1
@@ -40,6 +44,10 @@ Macro { description = "test 123",
 Macro { description = "test ABC",
 	id = win.Uuid(win.Uuid()),
 	area = "Editor",
+--	key = "LCtrlF9 RCtrlF9",
+--	key = "CtrlF9",
+--	key = "LCtrlF9",
+--	key = "RCtrlF9",
 --	priority = 100,
 	condition = function(key_rec_str, mcr_data)
 		mcr_data.a_cnt = (mcr_data.a_cnt or 0) + 1
@@ -108,7 +116,7 @@ do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 	}
 end
 
-local test_mcr_key = "CtrlF9"
+local test_mcr_key = "CtrlAltF9"
 for ii, ii_key in ipairs({
 	test_mcr_key..":Double",
 	test_mcr_key..":Hold",
@@ -119,7 +127,7 @@ do	Macro {	description = ii_key.." (Common+Editor) MacroEx example",
 		area	= "Common Editor",
 		key	= ii_key,
 		priority= 100,
-		condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
+--		condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action	= function(mcr_src)
 			far.Message(
 				"You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))),
@@ -132,10 +140,12 @@ end
 Macro {	description = "CtrlF9-AltF9 (Viewer+Editor+Common) MacroEx example",
 	id = win.Uuid(win.Uuid()),
 	area = "Viewer Editor Common",
-	key = "CtrlF9-AltF9",
+--	key = "CtrlF9-AltF9",
 	priority = 100,
-	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
+--	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description.." ("..Area.Current..")") end
 }
 
 -- @@@@@
+
+
