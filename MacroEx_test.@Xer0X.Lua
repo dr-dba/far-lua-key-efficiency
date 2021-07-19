@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.7",
+	version_mod	= "0.7.8",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -109,20 +109,23 @@ for ii, ii_key in ipairs({
 	"CtrlS:Hold-F3-F2:Double-F1",
 	"CtrlS:Hold-F3-F2:Hold-F1",
 	"CtrlS-F1-F2-F3:Hold",
-	"CtrlF8-Alt"
+	"CtrlF8-Alt",
+	"ShiftSpace-Space-1-2-3",
+	"AltEsc:Double-Space-A-B-C"
 })
 do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 		id = win.Uuid(win.Uuid()),
 		area = "Editor Shell",
 		disabled = true,
 		key = ii_key,
+		priority = ii, 
 		sortpriority = ii % 5;
 	--	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
 	}
 end
 
-local test_mcr_key = "CtrlAltF9"
+local test_mcr_key = "CtrlF9"
 for ii, ii_key in ipairs({
 	test_mcr_key..":Double",
 	test_mcr_key..":Hold",
@@ -146,7 +149,7 @@ end
 Macro {	description = "CtrlF9-AltF9 (Viewer+Editor+Common) MacroEx example",
 	id = win.Uuid(win.Uuid()),
 	area = "Viewer Editor Common",
---	key = "CtrlF9-AltF9",
+	key = "CtrlF9-AltF9",
 	priority = 100,
 --	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description.." ("..Area.Current..")") end
