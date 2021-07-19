@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.4.3",
+	version_mod	= "2.5",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -222,8 +222,8 @@ local function fnc_is_cas_mod_rls(key_rec)
 	local mouse_cas = band(Mouse.LastCtrlState,	MOD_MASK)
 	local input_cas = band(key_rec.ControlKeyState,	MOD_MASK)
 	return	0 == band(mouse_cas, input_cas)
-		and (	0 ~= mouse_cas or
-			0 ~= input_cas
+		and (	0 ~= mouse_cas
+		or	0 ~= input_cas
 		),
 		mouse_cas
 end
@@ -351,13 +351,13 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	end
 end
 
-local function fnc_get_seq_hlp(key_scr, cond_prio_curr, tbl_key_seq)
+local function fnc_get_seq_hlp(key_scr, prio_cond, tbl_key_seq)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
 	local	tbl_hlp = { }
 	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
 	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
-		do	if	cond_prio_curr[ii_mcr_idx]
-			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
+		do	if	prio_cond[ii_mcr_idx]
+			and	prio_cond[ii_mcr_idx][jj_key_full]
 			then	--[[ to get rid of wrong keys in the help,
 				like in "CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
 				need to make comparing sequences and use it in help ]]
@@ -375,16 +375,16 @@ local function fnc_get_seq_hlp(key_scr, cond_prio_curr, tbl_key_seq)
 			end
 		end
 	end
-	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress Escape to cancel the sequence" or false
+	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress AltEscape to cancel the sequence\nPress ShiftSpace to run as normal keys" or false
 end -- fnc_get_seq_hlp
 
-local function fnc_get_fin_scp(key_scr, cond_prio_curr, tbl_key_seq)
+local function fnc_get_fin_scp(key_scr, prio_cond, tbl_key_seq)
 	local	tbl_fin = { }
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr or { })
 	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
 	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
-		do	if	cond_prio_curr[ii_mcr_idx]
-			and	cond_prio_curr[ii_mcr_idx][jj_key_full]
+		do	if	prio_cond[ii_mcr_idx]
+			and	prio_cond[ii_mcr_idx][jj_key_full]
 			then    if	#jj_key_path == #tbl_key_seq
 				then	local	is_equal = true -- lets be optimic
 					for ii_seq_pos, ii_seq_key in pairs(tbl_key_seq)
@@ -518,7 +518,7 @@ local function fnc_macro_key_check(key_scr)
 			end
 		end
 	end
-	table.sort(macrolist, function(m1, m2) 
+	table.sort(macrolist, function(m1, m2)
 		local m1_prio = m1.priority	or 0
 		local m2_prio = m2.priority	or 0
 		local m1_sort = m1.sortpriority or 0
@@ -566,8 +566,10 @@ end
 
 local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 	if flg_ext_mod_off then return false end
-	obj_handler.prio_curr = fnc_macro_key_check(obj_handler.key_ext.SCP, false)
-	if next(obj_handler.prio_curr) then return 0 end
+	obj_handler.prio_cond,
+	obj_handler.macrolist
+		= fnc_macro_key_check(obj_handler.key_ext.SCP, false)
+	if next(obj_handler.prio_cond) then return 0 end
 end -- fnc_hnd_mcr_condition
 
 local obj_waitkeys = {
@@ -588,6 +590,9 @@ local obj_waitkeys = {
 		then	tbl_insert(self.keys, the_key)
 		end
 		return	the_key, Far.UpTime
+	end,
+	last_rem = function(self)
+		self.keys[#self.keys] = nil
 	end
 }
 
@@ -597,8 +602,9 @@ end
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local obj_scr = far.SaveScreen()
-	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, is_cas_mod_rls, cas_int_new, t_wait_key
-	local run_mode = "ask_normal" -- default mode
+	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, t_wait_key,
+		is_ext_timeout, is_doubled, is_holding, is_cas_mod_rls, cas_int_new
+--	local run_mode = "ask-normal" -- default mode
 	local key_str_bas = akey(1, 0) 
 	local obj_key_lev = {
 		key_str_act	= key_str_bas,				
@@ -613,7 +619,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_exp		= { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
 		key_time	= Far.UpTime,					
 	}
-	local tbl_key_lev = { obj_key_lev } -- init
+	local tbl_key_lev = { obj_key_lev, run_mode = "ask-normal" } -- init
 	local obj_key_cur = {
 		exp = obj_key_lev.key_exp,
 		bas = str_lower(obj_key_lev.key_str_bas),
@@ -628,21 +634,32 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	vkc_no_repeat = obj_key_lev.key_rec.VirtualKeyCode -- global var, prevent autorepeat
 	repeat
 		key_str_new, t_wait_key = obj_waitkeys:save(50)
-		if	key_str_new == "Esc"
-		then	run_mode = "cancel"; break
+		if	key_str_new ==  "AltEsc"
+		or	key_str_new == "RAltEsc"
+		then	tbl_key_lev.stop_cause = "user-cancel"
+			tbl_key_lev.run_mode	= "run-cancel"
+			break
+		elseif	key_str_new == "ShiftSpace"
+		and	key_str_bas ~= "ShiftSpace" -- allow starting ShiftSpace:Double
+		--[[ "ShiftSpace" is used as ability for user to run the sequence "as is" in normal mode,
+		but if so, without "ShiftSpace" if so:]]
+		then	obj_waitkeys:last_rem() -- remove ShiftSpace
+			tbl_key_lev.stop_cause = "user-normal"
+			tbl_key_lev.run_mode	= "run-normal"
+			break
 		end
-		local	is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
+		is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
 		-- holding is considered only after exceeding OPT_DELAY_EXT time frame
-		local	was_hld = not obj_key_lev.ext_type and key_str_new == "" and	is_ext_timeout and fnc_is_holding(obj_key_lev.key_rec)
+		is_holding = not obj_key_lev.ext_type and key_str_new == "" and	is_ext_timeout and fnc_is_holding(obj_key_lev.key_rec)
 		--[[ double key need to be double pressed in the time frame lesser than OPT_DELAY_EXT,
 		to differentiate it from subsequent presses of the same key,
 		as for example to differentiate "CtrlF9:Double" and "CtrlF9-CtrlF9" ]]
-		local	was_dbl = not obj_key_lev.ext_type and key_str_new ~= "" and not is_ext_timeout
+		is_doubled = not obj_key_lev.ext_type and key_str_new ~= "" and not is_ext_timeout
 			and (	fnc_key_equal(key_str_new, obj_key_lev.key_str_act)
 			or	fnc_key_equal(key_str_new, obj_key_lev.key_str_bas))
 		local	str_ext =
-				was_hld and key_ext.HLD and "HLD" or
-				was_dbl and key_ext.DBL and "DBL"
+				is_holding and key_ext.HLD and "HLD" or
+				is_doubled and key_ext.DBL and "DBL"
 		if	str_ext
 		then
 			key_str_bas = false
@@ -665,7 +682,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					band(key_rec	.ControlKeyState, MOD_MASK)
 			if not	cas_mod_is_same
 			and	BREAK_SEQ_ON_MOD_RELEASE
-			then	break -- run normal
+			then	tbl_key_lev.cas_mod_expect = band(key_rec    .ControlKeyState, MOD_MASK)
+				tbl_key_lev.cas_mod_actual = band(key_rec_new.ControlKeyState, MOD_MASK)
+				tbl_key_lev.stop_cause = "brk-on-cas-mod-rls"
+				tbl_key_lev.run_mode	= "ask-normal"
+				break
 			end
 			local	key_str_try = key_str_new
 			local	plain_tried, same_cas_tried
@@ -703,7 +724,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				goto seq_key_try
 			end
 			if not	key_str_seq -- ? is it registered sequence key
-			then	local abc = 111
+			then	tbl_key_lev.stop_cause = "wrong-seq"
+				tbl_key_lev.run_mode	= "ask-normal"
 				break -- run normal
 			end
 			obj_key_lev.next_type = "SEQ"
@@ -737,12 +759,17 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			}
 			tbl_key_seq[#tbl_key_seq + 1] = obj_key_cur
 		else -- no SEQ/HLD/DBL
-			if OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
-			then far_Message(
-				fnc_get_seq_hlp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq),
-				obj_key_lev.key_str_seq,
-				"", "l"
-					)
+			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
+			then	local	hlp_str = fnc_get_seq_hlp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq)
+				if not	hlp_str
+				then	obj_status:set(obj_key_lev.key_str_seq..(is_holding and " holding for too long?" or "!?!?!?"), nil, 10000000)
+					tbl_key_lev.is_holding = is_holding
+					tbl_key_lev.is_doubled = is_doubled
+					tbl_key_lev.stop_cause	= "ext-seq-none"
+					tbl_key_lev.run_mode	= "ask-normal"
+					break -- considering example CtrlAltS:Doubble, but just holding
+				else	far_Message(hlp_str, obj_key_lev.key_str_seq, "", "l")
+				end
 			end
 		end
 		if	str_ext
@@ -751,8 +778,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			key_ext_pre = key_ext	
 			key_ext = key_ext_new	
 			obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
-			if #fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq) > 0
-			then	run_mode = "seq_ext"
+			if #fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq) > 0
+			then    tbl_key_lev.stop_cause = "ext-seq-exists"
+				tbl_key_lev.run_mode	= "ext-seq-run"
 				break
 			end
 		end
@@ -763,70 +791,87 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		and	BREAK_SEQ_ON_MOD_RELEASE-- CAS changed when should not
 		then	tbl_key_lev.is_cas_mod_rls = is_cas_mod_rls
 			tbl_key_lev.cas_mod_int_rls= cas_int_new
-			break -- run normal
+			tbl_key_lev.stop_cause	= "cas-mod-rls"
+			tbl_key_lev.run_mode	= "ask-normal"
+			break
 		end
 		if  not obj_key_lev.key_ext.SEQ	-- no sequences
 		and not obj_key_lev.key_ext.EXT -- no extensions to wait
-		then	break -- run normal, is lost sequence
+		then	tbl_key_lev.stop_cause	= "no-ext-seq"
+			tbl_key_lev.run_mode	= "ask-normal"
+			break -- run normal, is lost sequence
 		end
 	until false
-	vkc_no_repeat = false
-	tbl_key_lev.run_mode = run_mode
+	vkc_no_repeat = false 
 	far.RestoreScreen(obj_scr)
-	if	run_mode == "ask_normal"
+	if	tbl_key_lev.run_mode == "ask-normal"
+	or	tbl_key_lev.run_mode == "run-normal"
 	then
-		local	bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq,
+		local	res_msg, bad_key_seq
+		if
+			tbl_key_lev.run_mode == "run-normal"
+		then
+			bad_key_seq = obj_key_lev.key_str_seq
+			res_msg = 1
+		else
+			bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq,
 				key_str_new and key_str_new ~= "" and key_str_new
-				or is_cas_mod_rls and "[CAS mode chg.:] "
-					..fnc_cas_int_to_str(obj_key_lev.key_rec_act.ControlKeyState, "<none>")
-					.." ==>> "
-					..fnc_cas_int_to_str(cas_int_new, "<none>")
+				or is_cas_mod_rls and str_format("[cas-mod-chg:] %s  ==>> %s",
+					fnc_cas_int_to_str(obj_key_lev.key_rec_act.ControlKeyState, "<none>"),
+					fnc_cas_int_to_str(cas_int_new, "<none>"))
 				or "???")
-		if not	tbl_normal_ask[Area.Current]
-		then	tbl_normal_ask[Area.Current] = { }
-		end
-		local	inf_saved = tbl_normal_ask[Area.Current][bad_key_seq]
-		local	cnt_use = inf_saved and (inf_saved % 1000000) or 0
-		local	res_msg = inf_saved and (inf_saved - cnt_use) / 1000000
-		if not  res_msg
-		then	res_msg = far.Message(
+			if not	tbl_normal_ask[Area.Current]
+			then	tbl_normal_ask[Area.Current] = { }
+			end
+			local inf_saved, cnt_use
+			inf_saved = tbl_normal_ask[Area.Current][bad_key_seq]
+			cnt_use	= inf_saved and (inf_saved % 1000000) or 0
+			res_msg = inf_saved and (inf_saved - cnt_use) / 1000000
+			if not res_msg
+			then res_msg = far.Message(
 				str_format(
 					"%s\n\1\nDo you want to run these keys as normal for %s area?\n\1\n%s\n\2",
-					bad_key_seq, str_upper(Area.Current), tbl_concat(obj_waitkeys.keys, ", ")
-				),
+					bad_key_seq, str_upper(Area.Current), tbl_concat(obj_waitkeys.keys, ", ")),
 				"WRONG SEQUENCE",
 				"&YES;yes &Save;&NOT;not sav&E",
-				"w"
-			)
-		end
-		if	res_msg == 2
-		or	res_msg == 4
-		then -- to store(save) response for future use
-			tbl_normal_ask[Area.Current][bad_key_seq] = res_msg * 1000000 + cnt_use + 1
-			if	cnt_use == 0
-			then	fnc_sett_data_store()
+				"w")
+			end
+			if	res_msg == 2
+			or	res_msg == 4
+			then -- to store(save) response for future use
+				tbl_normal_ask[Area.Current][bad_key_seq] = res_msg * 1000000 + cnt_use + 1
+				if	cnt_use == 0
+				then	fnc_sett_data_store()
+				end
 			end
 		end
 		if	res_msg == 1 -- run normal, not saved
 		or	res_msg == 2 -- run normal, saved as default response
-		then	obj_status:set(str_format("%s anassigned run normal%s", bad_key_seq, res_msg == 2 and " (saved)" or ""), nil, 2500)
+		then
+			obj_status:set(
+				str_format("%s%s run normal%s", str_gsub(bad_key_seq, "-", " "),
+					tbl_key_lev.run_mode == "ask-normal" and " anassigned," or "",
+					res_msg == 2 and " (saved)" or ""
+				),
+				nil, 2500)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
-			do	local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
+			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
 			end
 			flg_ext_mod_off = false
-		else	obj_status:set(str_format("%s anassigned run cancel%s", bad_key_seq, res_msg == 4 and " (saved)" or ""), nil, 2500)
+		else
+			obj_status:set(str_format("%s anassigned run cancel%s", bad_key_seq, res_msg == 4 and " (saved)" or ""), nil, 2500)
 			mf.beep() -- http://forum.farmanager.com/viewtopic.php?p=131249#p131249
 		end
 	elseif
-		run_mode == "seq_ext"
+		tbl_key_lev.run_mode == "ext-seq-run"
 	then
 		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 100000)
 		local	eval_ok, eval_res = runMacro(obj_key_lev.key_str_seq)
 		if not	eval_ok
 		and	eval_res == -2
 		then -- just take the first macro object:
-			local scr_num, scr_obj = next(fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_curr, tbl_key_seq))
+			local scr_num, scr_obj = next(fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq))
 			eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
 			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
 			--[[ TODO: upon unsuccess when macro not found especiallly,
@@ -834,7 +879,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		end
 		obj_status:set(str_format("%s Run %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
 	elseif
-		run_mode == "cancel"
+		tbl_key_lev.run_mode == "run-cancel"
 	then
 		obj_status:set(str_format("%s sequence canceled", obj_key_lev.key_str_seq), nil, 3000)
 	end
@@ -884,8 +929,8 @@ local function fnc_macro_ex_create(tbl_handlers)
 			priority	= ii_area_key_handler.priority,
 			action		= ii_area_key_handler.fnc_action,
 			condition	= ii_area_key_handler.fnc_condition,
-			priority	= 0, 
-			sortpriority	= 0, 
+			priority	= 0, -- extended keys must NOT override plain keys
+			sortpriority	= 0, -- extended keys must NOT override plain keys
 			ext_key_hnd	= ii_area_key_handler,
 			FileName	= own_fpath,
 		}
