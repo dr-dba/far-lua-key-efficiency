@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.5",
+	version_mod	= "2.5.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -634,8 +634,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	vkc_no_repeat = obj_key_lev.key_rec.VirtualKeyCode -- global var, prevent autorepeat
 	repeat
 		key_str_new, t_wait_key = obj_waitkeys:save(50)
-		if	key_str_new ==  "AltEsc"
-		or	key_str_new == "RAltEsc"
+		if (	key_str_new ==  "AltEsc"
+		or	key_str_new == "RAltEsc")
+		and	key_str_new ~= key_str_bas
 		then	tbl_key_lev.stop_cause = "user-cancel"
 			tbl_key_lev.run_mode	= "run-cancel"
 			break
@@ -762,13 +763,15 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
 			then	local	hlp_str = fnc_get_seq_hlp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq)
 				if not	hlp_str
-				then	obj_status:set(obj_key_lev.key_str_seq..(is_holding and " holding for too long?" or "!?!?!?"), nil, 10000000)
+				then	
+					obj_status:set(obj_key_lev.key_str_seq..(is_holding and " holding for too long?" or "!?!?!?"), nil, 10000000)
 					tbl_key_lev.is_holding = is_holding
 					tbl_key_lev.is_doubled = is_doubled
 					tbl_key_lev.stop_cause	= "ext-seq-none"
 					tbl_key_lev.run_mode	= "ask-normal"
 					break -- considering example CtrlAltS:Doubble, but just holding
-				else	far_Message(hlp_str, obj_key_lev.key_str_seq, "", "l")
+				else
+					far_Message(hlp_str, obj_key_lev.key_str_seq.."-... ?", "", "l")
 				end
 			end
 		end
@@ -784,7 +787,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				break
 			end
 		end
-		if	obj_key_lev.key_ext.KXP.key ~= ""
+		if	obj_key_lev.key_ext.KXP
+		and	obj_key_lev.key_ext.KXP.key ~= "" -- need to be plain key to break on wrong CasModChg
 		then	is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
 		end
 		if	is_cas_mod_rls 
