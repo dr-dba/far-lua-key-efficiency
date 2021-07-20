@@ -17,7 +17,7 @@ https://github.com/dr-dba/lua-serialize
 dmp-tbl-alt-@Xer0X.Lua
 ]]
 
--- ### OPTIONS BLOCK ###
+-- ### INFO AND OPTIONS BLOCK ###
 
 -- luacheck: ignore 113/Info
 local Info = Info or package.loaded.regscript or function(...) return ... end
@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.5.2",
+	version_mod	= "2.5.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -55,7 +55,7 @@ local nfo = Info({
 if not nfo then return end
 local opts = nfo.options
 
--- @@@ END OF THE OPTIONS BLOCK @@@
+-- @@@ END OF THE INFO AND OPTIONS BLOCK @@@
 
 local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
 local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
@@ -143,8 +143,7 @@ Xer0X.tbl_ext_key_lev_hist = { }
 local tbl_key_lev_hist = Xer0X.tbl_ext_key_lev_hist
 local tbl_normal_ask__load = loadfile(own_fpath..".dat")
 local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
-local flg_ext_mod_off	-- to disable handler in order to run an original macro
-local vkc_no_repeat
+local vkc_no_repeat, flg_ext_mod_off	-- to disable handler in order to run an original macro
 
 local function fnc_err_msg(msg, ...)
 	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
@@ -234,9 +233,9 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 	do	for jj_mcr_id, jj_mcr_obj in pairs(ii_obj_coll.scripts)
 		do	local	jj_mcr_item = tbl_res[jj_mcr_id]
 			if	jj_mcr_item
-			then	jj_mcr_item.keys_full[ii_key_full] = ii_obj_coll.key_pth2
+			then	jj_mcr_item.keys_full[ii_key_full] = ii_obj_coll.key_path
 			else	jj_mcr_item = {
-					keys_full = {[ii_key_full] = ii_obj_coll.key_pth2 },
+					keys_full = {[ii_key_full] = ii_obj_coll.key_path },
 					mcr_extid = jj_mcr_id,
 					obj_macro = jj_mcr_obj,
 				}
@@ -343,7 +342,6 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	then	return fnc_copy_key_ext_val(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_loc, copy_key_idx, copy_key_val)
 	elseif	copy_key_idx == "KXP"
 	or	copy_key_idx == "key_path"
-	or	copy_key_idx == "key_pth2"
 	then	if not	tbl_dest_loc[copy_key_idx]
 		then	tbl_dest_loc[copy_key_idx] = copy_key_val
 		end
@@ -534,6 +532,33 @@ local function fnc_macro_key_check(key_scr)
 end -- fnc_macro_key_check
 
 
+local obj_waitkeys = {
+	keys = { },
+	init = function(self, keys)
+		local type_keys = type(keys)
+		self.keys= type_keys == "nil"	and { }
+			or type_keys == "table"	and keys
+			or { keys } -- should be string
+		self.no_key = nil
+	end,
+	save = function(self, ...)
+		local	the_key = mf_waitkey(...)
+		local	has_key = the_key ~= ""
+		local	isNewOn = self.no_key and has_key
+		self.no_key = not has_key
+		if	the_key ~= ""
+		then	tbl_insert(self.keys, the_key)
+		end
+		return	the_key, Far.UpTime
+	end,
+	last_rem = function(self)
+		self.keys[#self.keys] = nil
+	end
+}
+
+local function fnc_sett_data_store()
+	local res_val, file_hnd = dmp_srlz.fnc_file_save(tbl_normal_ask, { file_path = own_fpath..".dat", file_init = true, file_close = true })
+end
 
 local function fnc_cas_int_to_str(cas_mod, empty_str)
 	local ret_val =	""
@@ -572,34 +597,6 @@ local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 	if next(obj_handler.prio_cond) then return 0 end
 end -- fnc_hnd_mcr_condition
 
-local obj_waitkeys = {
-	keys = { },
-	init = function(self, keys)
-		local type_keys = type(keys)
-		self.keys= type_keys == "nil"	and { }
-			or type_keys == "table"	and keys
-			or { keys } -- should be string
-		self.no_key = nil
-	end,
-	save = function(self, ...)
-		local	the_key = mf_waitkey(...)
-		local	has_key = the_key ~= ""
-		local	isNewOn = self.no_key and has_key
-		self.no_key = not has_key
-		if	the_key ~= ""
-		then	tbl_insert(self.keys, the_key)
-		end
-		return	the_key, Far.UpTime
-	end,
-	last_rem = function(self)
-		self.keys[#self.keys] = nil
-	end
-}
-
-local function fnc_sett_data_store()
-	local res_val, file_hnd = dmp_srlz.fnc_file_save(tbl_normal_ask, { file_path = own_fpath..".dat", file_init = true, file_close = true })
-end
-
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local obj_scr = far.SaveScreen()
 	local key_ext_pre, key_ext_new, key_rec_pre, key_str_new, t_wait_key,
@@ -610,7 +607,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_str_act	= key_str_bas,				
 		key_str_bas	= key_str_bas,				
 		key_str_bas_ext = key_str_bas,				
-		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),
+		key_str_seq	= key_str_bas:gsub("-", "Minus"):gsub("+", "Plus"),
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
 		key_ext		= obj_handler.key_ext,				
@@ -741,7 +738,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				key_ext =	key_obj_seq,
 				key_rec_pre =	key_rec,
 				key_rec =	key_rec_try,
-				key_str_seq =	obj_key_lev.key_str_seq.."-"..str_gsub(fnc_key_prettify(key_str_try), "-", "Minus"),
+				key_str_seq =	obj_key_lev.key_str_seq.."-"..fnc_key_prettify(key_str_try):gsub("-", "Minus"):gsub("+", "Plus"),
 				key_exp =	key_exp_try,
 				key_time=	t_wait_key,
 			}
@@ -790,15 +787,16 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
 		if	is_cas_mod_rls 
 		and	BREAK_SEQ_ON_MOD_RELEASE -- CAS changed when should not
-		and	obj_key_lev.key_ext.KXP -- need to be a plain key to break on wrong CasModChg
-		and	obj_key_lev.key_ext.KXP.key ~= ""
+		and (	obj_key_lev.key_bas -- need to be a plain key to break on wrong CasModChg
+		or	obj_key_lev.key_ext).KXP.key ~= ""
 		then	tbl_key_lev.is_cas_mod_rls = is_cas_mod_rls
 			tbl_key_lev.cas_mod_int_rls = cas_int_new
 			tbl_key_lev.stop_cause	= "cas-mod-rls"
 			tbl_key_lev.run_mode	= "ask-normal"
 			break
 		end
-		-- HUGE TODO: make here conditioning
+		--[[ HUGE TODO: make here conditioning, but, actually,
+		this check should be immediatly in the new sequence key analize and receive block]]
 		if  not obj_key_lev.key_ext.SEQ	-- no sequences
 		and not obj_key_lev.key_ext.EXT -- no extensions to wait
 		then	tbl_key_lev.stop_cause	= "no-ext-seq"
@@ -818,9 +816,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			res_msg = 1
 		else
 			bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq,
-				key_str_new and key_str_new ~= "" and key_str_new
+				key_str_new ~= "" and key_str_new
 				or is_cas_mod_rls and str_format("[cas-mod-chg:] %s  ==>> %s",
-					fnc_cas_int_to_str(obj_key_lev.key_rec_act.ControlKeyState, "<none>"),
+					fnc_cas_int_to_str(key_rec.ControlKeyState, "<none>"), 
 					fnc_cas_int_to_str(cas_int_new, "<none>"))
 				or "???")
 			if not	tbl_normal_ask[Area.Current]
@@ -836,8 +834,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					"%s\n\1\nDo you want to run these keys as normal for %s area?\n\1\n%s\n\2",
 					bad_key_seq, str_upper(Area.Current), tbl_concat(obj_waitkeys.keys, ", ")),
 				"WRONG SEQUENCE",
-				"&YES;yes &Save;&NOT;not sav&E",
-				"w")
+				"&YES;yes &Save;&NOT;not sav&E", "w")
 			end
 			if	res_msg == 2
 			or	res_msg == 4
@@ -948,7 +945,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		local tbl_key_ii = { }
 		local tbl_ext	 = { }
 		local tbl_ext_jj = tbl_ext
-		local jj_key_base, jj_ext_mode, ii_has_ext
+		local ii_has_ext
 		for jj_key_seq, jj_key_sep in string.gmatch(ii_key, "([^-+]*)([-+]?)") 
 		do
 			if	jj_key_seq == ""
@@ -972,7 +969,6 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq:gsub("minus", "-"):gsub("plus", "+"), sep = jj_key_sep }
 			::seq_keys_loop_end::
 		end
-		local tbl_kxp_ii = { }
 		if	ii_has_ext
 		then
 			if not	obj_mcr.data.id_ext -- have to have ext_id, for reloading or detecting
@@ -980,18 +976,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			for	jj, jj_key_seq in pairs(tbl_key_ii)
 			do
-				jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
+				local	jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
 				if	jj_ext_mode
 				then	-- here ext_mode supposed to be HLD or DBL
 					jj_ext_mode = tbl_ext_mode_code[jj_ext_mode]
 				else	jj_key_base = jj_key_seq.key
 				end
 				local tbl_key_exp_jj = fnc_key_expand(jj_key_base, true, true)
-				tbl_kxp_ii[#tbl_kxp_ii + 1] = { exp = tbl_key_exp_jj, bas = jj_key_base, ext = jj_ext_mode, key = jj_key_seq.key, sep = jj_key_seq.sep }
+				jj_key_seq.exp = tbl_key_exp_jj
+				jj_key_seq.bas = jj_key_base
+				jj_key_seq.ext = jj_ext_mode
 				local tbl_scr_key = { [ii_key] = {
 					key_full = ii_key,
 					key_path = tbl_key_ii,
-					key_pth2 = tbl_kxp_ii,
 					scripts = { [obj_mcr.data.id_ext] = obj_mcr }
 				} }
 				local tbl_seq_stub = { }
@@ -1014,7 +1011,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			then	obj_mcr.data.key_seq_all = { }
 			end
 			if not	obj_mcr.data.key_seq_all[ii_key]
-			then	obj_mcr.data.key_seq_all[ii_key] = tbl_kxp_ii -- is better than tbl_key_ii
+			then	obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- tbl_kxp_ii is better than tbl_key_ii.. but eventually we come to the complex path approach
 			end
 			obj_mcr.data.areas_arr = fnc_str_split(str_lower(obj_mcr.area), "%s+", true)
 			obj_mcr.data.areas_dict = { }
