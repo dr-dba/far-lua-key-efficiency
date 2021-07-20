@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.5.3",
+	version_mod	= "2.6",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -49,7 +49,9 @@ local nfo = Info({
 			HLD = true, -- holding
 			DBL = true, -- double
 		},
-		Debug		= false,
+		DbgShowBadExt	= false,
+		DbgShowLoadTime	= true,
+		DbgShowBadKey	= true,
 	}
 })
 if not nfo then return end
@@ -60,7 +62,6 @@ local opts = nfo.options
 local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
 local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
 local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
-local OPT_DEBUG			= opts.Debug
 local OPT_DELAY_SEQ		= opts.DelaySeq
 local OPT_DELAY_HLP		= opts.DelayHlp
 local OPT_DELAY_EXT		= opts.DelayExt
@@ -97,7 +98,7 @@ local MOD_MASK = bor(
 	SHIFT_PRESSED
 		)
 local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
-local	tbl_ext_mode_show = { DBL = ":Double",	HLD = ":Hold"}
+local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold"}
 local	Xer0X	= require("Lib-Common-@Xer0X")
 local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
 local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
@@ -137,6 +138,7 @@ local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 local KEY_STR_FMT	= "%s%s%s%s"
 local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
+local LoadedMacros	= Xer0X.utils.LoadedMacros
 local tbl_handlers	= { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
 Xer0X.tbl_ext_key_lev_hist = { }
@@ -148,8 +150,8 @@ local vkc_no_repeat, flg_ext_mod_off	-- to disable handler in order to run an or
 local function fnc_err_msg(msg, ...)
 	local	msg2 = msg.."\n\2"..debug.traceback("", 2):gsub("\t", "  ")
 	local	buttons = select('#', ...) > 0 and "Ok;&Lua explorer" or "Ok"
-	repeat	local	a_msg_res = far_Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
-		if	a_msg_res == 2
+	repeat	local	msg_res = far_Message(msg2, "MacroEx: error in macro definition", buttons, "wl")
+		if	msg_res == 2
 		then	-- to view args
 			fnc_lua_exp({ ... }, msg)
 		else	break
@@ -187,7 +189,7 @@ local far_NameToInputRecord = function(the_key)
 			or	far.NameToInputRecord(	the_key)
 			or	fnc_combo_mod_try(	the_key)
 	if not	key_inp_rec
-	then    if OPT_DEBUG
+	then    if opts.DbgShowBadKey
 		then fnc_err_msg(str_format("Unexpected AKey: %q", the_key))
 		end
 	else	tbl_key_rec_cache[the_key] = key_inp_rec
@@ -247,17 +249,18 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 end
 
 local rgx_key_parse = regex.new("/^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$/i")
-local function fnc_key_parse(the_key)
-	local RLctl, RLalt, shift, plain = rgx_key_parse:match(the_key)
-	return {
-		RLctl = RLctl,
-		RLalt = RLalt,
-		shift = shift,
-		plain = plain,
+local function fnc_key_parse(the_key, in_upper)
+	local RLctl, RLalt, shift, plain = rgx_key_parse:match(the_key) 
+	return { 
+		RLctl = RLctl and (in_upper and str_upper(RLctl) or str_lower(RLctl)),
+		RLalt = RLalt and (in_upper and str_upper(RLalt) or str_lower(RLalt)),
+		shift = shift and (in_upper and str_upper(shift) or str_lower(shift)),
+		plain = plain and (in_upper and str_upper(plain) or str_lower(plain)),
+		plorc = plain 
 	}
 end
 
-local function fnc_key_expand(the_key, in_lower, str_id, as_received)
+local function fnc_key_expand(the_key, in_lower, str_id, as_received )
 	if not the_key then return end
 --	assert(key:match("^%l+$"))
 	local R =	in_lower and "r"	or "R"
@@ -265,17 +268,17 @@ local function fnc_key_expand(the_key, in_lower, str_id, as_received)
 	local ALT =	in_lower and "alt"	or "Alt"
 	local CTL =	in_lower and "ctrl"	or "Ctrl"
 	local NONE=	in_lower and "<none>"	or "<NONE>"
-	local obj_key = fnc_key_parse(str_lower(the_key))
+	local obj_key = fnc_key_parse(the_key) 
 	local tbl_exp = { }
 	local ctl, alt, sft, ctl2, alt2, key
-	ctl = obj_key.RLctl == "" and L -- (in_lower and "l" or "L")
+	ctl = obj_key.RLctl == "" and L
 	repeat
-	alt = obj_key.RLalt == "" and L -- (in_lower and "l" or "L")
+	alt = obj_key.RLalt == "" and L
 	repeat
 	ctl2 = ctl or obj_key.RLctl
 	alt2 = alt or obj_key.RLalt
 	key = obj_key.plain or ""
-	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key }
+	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key, koc = obj_key.plorc } 
 	tbl_key.vis	= str_lower(str_format(KEY_VIS_FMT,
 		ctl2 or 0,
 		alt2 or 0,
@@ -662,12 +665,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		then
 			key_str_bas = false
 			obj_key_lev.ext_type		= str_ext
-			obj_key_lev.key_str_bas_ext	= obj_key_lev.key_str_bas..tbl_ext_mode_show[obj_key_lev.ext_type]
-			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..tbl_ext_mode_show[obj_key_lev.ext_type]
+			obj_key_lev.key_str_bas_ext	= obj_key_lev.key_str_bas..tbl_ext_mode_disp[obj_key_lev.ext_type]
+			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..tbl_ext_mode_disp[obj_key_lev.ext_type]
 			obj_key_lev.key_bas		= obj_key_lev.key_ext 
 			obj_key_lev.key_ext		= obj_key_lev.key_ext[obj_key_lev.ext_type]
 			obj_key_cur.ext			= str_ext 
-			obj_key_cur.key			= str_lower(obj_key_cur.key..tbl_ext_mode_show[str_ext])
+			obj_key_cur.key			= str_lower(obj_key_cur.key..tbl_ext_mode_disp[str_ext])
 			key_ext_new			= obj_key_lev.key_ext 
 		elseif
 			key_str_new ~= "" -- got the next key
@@ -940,13 +943,14 @@ end -- fnc_macro_ex_create
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_handlers_loc = { }
+	local mcr_id_ext = str_upper(win_uuid(win_uuid()))
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s", true))
 	do	local obj_mcr_ii = { [ii_key] = { obj_mcr } }
 		local tbl_key_ii = { }
-		local tbl_ext	 = { }
-		local tbl_ext_jj = tbl_ext
+		local tbl_ext_ii = { }
+		local tbl_ext_jj = tbl_ext_ii
 		local ii_has_ext
-		for jj_key_seq, jj_key_sep in string.gmatch(ii_key, "([^-+]*)([-+]?)") 
+		for jj_key_seq, jj_key_sep in str_gmatch(ii_key, "([^-+]*)([-+]?)") 
 		do
 			if	jj_key_seq == ""
 			then	if	#tbl_key_ii == 0
@@ -963,80 +967,69 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			-- try to save load time:
 			if not	ii_has_ext
 			and (	#tbl_key_ii > 0
-			or	string.find( jj_key_seq, "%S[:]%S"))
+			or	str_find( jj_key_seq, "%S[:]%S"))
 			then	ii_has_ext = true
 			end
-			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq:gsub("minus", "-"):gsub("plus", "+"), sep = jj_key_sep }
+			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq, sep = jj_key_sep }
 			::seq_keys_loop_end::
 		end
-		if	ii_has_ext
-		then
-			if not	obj_mcr.data.id_ext -- have to have ext_id, for reloading or detecting
-			then	obj_mcr.data.id_ext = str_upper(win_uuid(win_uuid()))
-			end
-			for	jj, jj_key_seq in pairs(tbl_key_ii)
-			do
-				local	jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
-				if	jj_ext_mode
-				then	-- here ext_mode supposed to be HLD or DBL
-					jj_ext_mode = tbl_ext_mode_code[jj_ext_mode]
-				else	jj_key_base = jj_key_seq.key
-				end
-				local tbl_key_exp_jj = fnc_key_expand(jj_key_base, true, true)
-				jj_key_seq.exp = tbl_key_exp_jj
-				jj_key_seq.bas = jj_key_base
-				jj_key_seq.ext = jj_ext_mode
-				local tbl_scr_key = { [ii_key] = {
-					key_full = ii_key,
-					key_path = tbl_key_ii,
-					scripts = { [obj_mcr.data.id_ext] = obj_mcr }
-				} }
-				local tbl_seq_stub = { }
-				local tbl_ext_stub = jj_ext_mode and { EXT = jj_ext_mode, SCP = tbl_scr_key }
-				if	jj_ext_mode
-				and	ALLOW_SEQ_IN_EXT
-				then	tbl_ext_stub.SEQ = tbl_seq_stub
-				end
-				for kk_str, kk_val in pairs(tbl_key_exp_jj)
-				do 	tbl_ext_jj[kk_str] = { EXT = jj_ext_mode and true, KXP = kk_val }
-					if	jj_ext_mode
-					then	tbl_ext_jj[kk_str][jj_ext_mode] = tbl_ext_stub
-					else	tbl_ext_jj[kk_str].SEQ = tbl_seq_stub
+		if not	ii_has_ext
+		then	goto enum_full_keys_loop_end
+		end
+		local tbl_scr_key_ii = { [ii_key] = {
+			key_full = ii_key,
+			key_path = tbl_key_ii,
+			scripts = { [mcr_id_ext] = obj_mcr }
+		} }
+		for	jj, jj_key_seq in pairs(tbl_key_ii)
+		do	jj_key_seq.key = jj_key_seq.key:gsub("minus", "-"):gsub("plus", "+") -- normalize orig key string
+			local tbl_seq_stub_jj = { }
+			local tbl_ext_stub_jj
+			local	jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
+			if	jj_ext_mode
+			then	-- here ext_mode supposed to be HLD or DBL
+				local	jj_ext_code = tbl_ext_mode_code[jj_ext_mode]
+				if	jj_ext_code
+				then	jj_key_seq.ext = jj_ext_code
+					jj_key_seq.bas = jj_key_base
+					tbl_ext_stub_jj = { EXT = jj_ext_code, SCP = tbl_scr_key_ii, SEQ = ALLOW_SEQ_IN_EXT and tbl_seq_stub_jj }
+				else	if opts.DbgShowBadExt
+					then fnc_err_msg(str_format("wrong extension %s in sequence %s", jj_ext_mode, ii_key))
 					end
-					tbl_ext_jj[kk_str].SCP = tbl_scr_key 
+					goto enum_full_keys_loop_end -- cancel sequences with bad extension
 				end
-				tbl_ext_jj = jj_ext_mode and ALLOW_SEQ_IN_EXT and tbl_ext_stub.SEQ or tbl_seq_stub
-			end -- end of the sequence keys processing loop
-			if not	obj_mcr.data.key_seq_all
-			then	obj_mcr.data.key_seq_all = { }
+			else	jj_key_seq.bas = jj_key_seq.key
 			end
-			if not	obj_mcr.data.key_seq_all[ii_key]
-			then	obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- tbl_kxp_ii is better than tbl_key_ii.. but eventually we come to the complex path approach
+			jj_key_seq.exp = fnc_key_expand(jj_key_seq.bas, true, true) -- unified complex key in lower case
+			for kk_str, kk_val in pairs(jj_key_seq.exp)
+			do 	tbl_ext_jj[kk_str] = { EXT = jj_key_seq.ext and true, KXP = kk_val, SCP = tbl_scr_key_ii }
+				if	jj_key_seq.ext
+				then	tbl_ext_jj[kk_str][jj_key_seq.ext] = tbl_ext_stub_jj
+				else	tbl_ext_jj[kk_str].SEQ = tbl_seq_stub_jj
+				end
 			end
+			tbl_ext_jj = jj_key_seq.ext and ALLOW_SEQ_IN_EXT and tbl_ext_stub_jj.SEQ or tbl_seq_stub_jj
+		end -- end of the sequence keys processing loop
+		if	obj_mcr.data.id_ext ~= mcr_id_ext
+		then	
+			obj_mcr.data.id_ext = mcr_id_ext
 			obj_mcr.data.areas_arr = fnc_str_split(str_lower(obj_mcr.area), "%s+", true)
 			obj_mcr.data.areas_dict = { }
-			for kk, kk_area in pairs(obj_mcr.data.areas_arr)
-			do obj_mcr.data.areas_dict[kk_area] = kk
-			end
-			local tbl_work_areas = obj_mcr.data.areas_arr
-			if obj_mcr.data.areas_dict.common
-			then tbl_work_areas = { "common" }
-			end
-			for kk_ext_key, kk_ext_obj in pairs(tbl_ext)
-			do 
-				for ll, ll_area in pairs(tbl_work_areas)
-				do	if	ll_area ~= "common"
-					and	tbl_handlers.common
-					and	tbl_handlers.common[kk_ext_obj.KXP.str]
-					then	ll_area = "common"
-					end
-					if not	tbl_handlers_loc[ll_area]
-					then	tbl_handlers_loc[ll_area] = { }
-					end
-					tbl_handlers_loc[ll_area][kk_ext_key] = fnc_key_handler_set(ll_area, kk_ext_obj, obj_mcr)
+			for mm, mm_area in pairs(obj_mcr.data.areas_arr)
+			do	obj_mcr.data.areas_dict[mm_area] = true
+				if not	tbl_handlers_loc[mm_area]
+				then	tbl_handlers_loc[mm_area] = { }
 				end
 			end
+			obj_mcr.data.areas_work = obj_mcr.data.areas_dict.common and { "common" } or obj_mcr.data.areas_arr
+			obj_mcr.data.key_seq_all = { }
 		end
+		obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- should be only once
+		for ll, ll_area in pairs(obj_mcr.data.areas_work) do
+		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii)	do
+			tbl_handlers_loc[ll_area][mm_ext_key] = fnc_key_handler_set(ll_area, mm_ext_obj, obj_mcr)
+		end end
+		::enum_full_keys_loop_end::
 	end
 	if	create_handlers
 	then	fnc_macro_ex_create(tbl_handlers_loc)
@@ -1045,8 +1038,9 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 end -- fnc_macro_ex_check_one
 
 local function fnc_macro_ex_build_all()
-	for ii = 1, #Xer0X.utils.LoadedMacros
-	do	local	ii_mcr = Xer0X.utils.LoadedMacros[ii]
+	local t1 = Far.UpTime
+	for ii = 1, #LoadedMacros
+	do	local	ii_mcr = LoadedMacros[ii]
 		local	ii_mcr_key = ii_mcr.key
 		if	ii_mcr_key
 		and not ii_mcr.keyregex
@@ -1055,6 +1049,9 @@ local function fnc_macro_ex_build_all()
 		end
 	end
 	fnc_macro_ex_create(tbl_handlers)
+	if opts.DbgShowLoadTime
+	then far_Message(Far.UpTime - t1, "extended keys load time")
+	end
 	return tbl_handlers
 end -- fnc_macro_ex_build_all
 
