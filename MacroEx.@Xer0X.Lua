@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.5.1",
+	version_mod	= "2.5.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -167,7 +167,7 @@ local function fnc_combo_mod_try(key)
 		local	k = far.NameToInputRecord(combo_key)
 		if	m
 		and	k
-		then	return {ControlKeyState	= m.ControlKeyState,
+		then	return{ ControlKeyState	= m.ControlKeyState,
 				VirtualKeyCode	= k.VirtualKeyCode }
 		end
 	end
@@ -610,7 +610,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_str_act	= key_str_bas,				
 		key_str_bas	= key_str_bas,				
 		key_str_bas_ext = key_str_bas,				
-		key_str_seq	= str_gsub(fnc_key_prettify(key_str_bas), "-", "Minus"),
+		key_str_seq	= str_gsub(key_str_bas, "-", "Minus"),
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
 		key_ext		= obj_handler.key_ext,				
@@ -629,7 +629,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	local key_ext	= obj_key_lev.key_ext
 	local key_rec	= obj_key_lev.key_rec
 	local t_last_key= obj_key_lev.key_time
-	obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
+	obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
 	obj_waitkeys:init(obj_key_lev.key_str_bas)
 	vkc_no_repeat = obj_key_lev.key_rec.VirtualKeyCode -- global var, prevent autorepeat
 	repeat
@@ -637,7 +637,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		if (	key_str_new ==  "AltEsc"
 		or	key_str_new == "RAltEsc")
 		and	key_str_new ~= key_str_bas
-		then	tbl_key_lev.stop_cause = "user-cancel"
+		then	tbl_key_lev.stop_cause	= "user-cancel"
 			tbl_key_lev.run_mode	= "run-cancel"
 			break
 		elseif	key_str_new == "ShiftSpace"
@@ -645,7 +645,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		--[[ "ShiftSpace" is used as ability for user to run the sequence "as is" in normal mode,
 		but if so, without "ShiftSpace" if so:]]
 		then	obj_waitkeys:last_rem() -- remove ShiftSpace
-			tbl_key_lev.stop_cause = "user-normal"
+			tbl_key_lev.stop_cause	= "user-normal"
 			tbl_key_lev.run_mode	= "run-normal"
 			break
 		end
@@ -685,7 +685,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			and	BREAK_SEQ_ON_MOD_RELEASE
 			then	tbl_key_lev.cas_mod_expect = band(key_rec    .ControlKeyState, MOD_MASK)
 				tbl_key_lev.cas_mod_actual = band(key_rec_new.ControlKeyState, MOD_MASK)
-				tbl_key_lev.stop_cause = "brk-on-cas-mod-rls"
+				tbl_key_lev.stop_cause	= "cas-mod-not-same"
 				tbl_key_lev.run_mode	= "ask-normal"
 				break
 			end
@@ -725,7 +725,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				goto seq_key_try
 			end
 			if not	key_str_seq -- ? is it registered sequence key
-			then	tbl_key_lev.stop_cause = "wrong-seq"
+			then	tbl_key_lev.stop_cause	= "wrong-seq"
 				tbl_key_lev.run_mode	= "ask-normal"
 				break -- run normal
 			end
@@ -763,10 +763,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
 			then	local	hlp_str = fnc_get_seq_hlp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq)
 				if not	hlp_str
-				then	
+				then
 					obj_status:set(obj_key_lev.key_str_seq..(is_holding and " holding for too long?" or "!?!?!?"), nil, 10000000)
-					tbl_key_lev.is_holding = is_holding
-					tbl_key_lev.is_doubled = is_doubled
+					tbl_key_lev.is_holding	= is_holding
+					tbl_key_lev.is_doubled	= is_doubled
 					tbl_key_lev.stop_cause	= "ext-seq-none"
 					tbl_key_lev.run_mode	= "ask-normal"
 					break -- considering example CtrlAltS:Doubble, but just holding
@@ -780,25 +780,25 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			t_last_key = t_wait_key 
 			key_ext_pre = key_ext	
 			key_ext = key_ext_new	
-			obj_status:set(obj_key_lev.key_str_seq.." ..?", nil, 10000000)
+			obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
 			if #fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq) > 0
-			then    tbl_key_lev.stop_cause = "ext-seq-exists"
+			then    tbl_key_lev.stop_cause	= "ext-seq-exists"
 				tbl_key_lev.run_mode	= "ext-seq-run"
 				break
 			end
 		end
-		if	obj_key_lev.key_ext.KXP
-		and	obj_key_lev.key_ext.KXP.key ~= "" -- need to be plain key to break on wrong CasModChg
-		then	is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
-		end
+		is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
 		if	is_cas_mod_rls 
-		and	BREAK_SEQ_ON_MOD_RELEASE-- CAS changed when should not
+		and	BREAK_SEQ_ON_MOD_RELEASE -- CAS changed when should not
+		and	obj_key_lev.key_ext.KXP -- need to be a plain key to break on wrong CasModChg
+		and	obj_key_lev.key_ext.KXP.key ~= ""
 		then	tbl_key_lev.is_cas_mod_rls = is_cas_mod_rls
-			tbl_key_lev.cas_mod_int_rls= cas_int_new
+			tbl_key_lev.cas_mod_int_rls = cas_int_new
 			tbl_key_lev.stop_cause	= "cas-mod-rls"
 			tbl_key_lev.run_mode	= "ask-normal"
 			break
 		end
+		-- HUGE TODO: make here conditioning
 		if  not obj_key_lev.key_ext.SEQ	-- no sequences
 		and not obj_key_lev.key_ext.EXT -- no extensions to wait
 		then	tbl_key_lev.stop_cause	= "no-ext-seq"
@@ -806,7 +806,6 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			break -- run normal, is lost sequence
 		end
 	until false
-	vkc_no_repeat = false 
 	far.RestoreScreen(obj_scr)
 	if	tbl_key_lev.run_mode == "ask-normal"
 	or	tbl_key_lev.run_mode == "run-normal"
@@ -853,7 +852,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		or	res_msg == 2 -- run normal, saved as default response
 		then
 			obj_status:set(
-				str_format("%s%s run normal%s", str_gsub(bad_key_seq, "-", " "),
+				str_format("%s%s (run normal)%s", str_gsub(bad_key_seq, "-", ", "),
 					tbl_key_lev.run_mode == "ask-normal" and " anassigned," or "",
 					res_msg == 2 and " (saved)" or ""
 				),
@@ -870,7 +869,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	elseif
 		tbl_key_lev.run_mode == "ext-seq-run"
 	then
-		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 100000)
+		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 1000000)
 		local	eval_ok, eval_res = runMacro(obj_key_lev.key_str_seq)
 		if not	eval_ok
 		and	eval_res == -2
@@ -881,11 +880,11 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			--[[ TODO: upon unsuccess when macro not found especiallly,
 			probably we should suggest ask for running rormal? ]]
 		end
-		obj_status:set(str_format("%s Run %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
+		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
 	elseif
 		tbl_key_lev.run_mode == "run-cancel"
 	then
-		obj_status:set(str_format("%s sequence canceled", obj_key_lev.key_str_seq), nil, 3000)
+		obj_status:set(str_format("%s sequence cancelled", obj_key_lev.key_str_seq), nil, 3000)
 	end
 	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev -- debug purposes only
 end -- fnc_hnd_mcr_action
@@ -944,31 +943,33 @@ end -- fnc_macro_ex_create
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_handlers_loc = { }
-	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s+", true))
+	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s", true))
 	do	local obj_mcr_ii = { [ii_key] = { obj_mcr } }
 		local tbl_key_ii = { }
 		local tbl_ext	 = { }
 		local tbl_ext_jj = tbl_ext
 		local jj_key_base, jj_ext_mode, ii_has_ext
-		for jj_key_seq in str_gmatch(ii_key.."-", "([^-]*)-")
-		do	if	jj_key_seq == ""
+		for jj_key_seq, jj_key_sep in string.gmatch(ii_key, "([^-+]*)([-+]?)") 
+		do
+			if	jj_key_seq == ""
 			then	if	#tbl_key_ii == 0
 				then	--[[ this phenomena happened to me on "-",
 					this is plain key, so just skip it]]
 					break -- ii_has_ext remains nil here
 				else	--[[ this phenomena happens onto such plain keys,
 					as "Alt-" for example, should be on finalizing key ]]
-					tbl_key_ii[#tbl_key_ii] = tbl_key_ii[#tbl_key_ii].."-"
+					tbl_key_ii[#tbl_key_ii].key = tbl_key_ii[#tbl_key_ii].key..tbl_key_ii[#tbl_key_ii].sep
+					tbl_key_ii[#tbl_key_ii].sep = jj_key_sep
 					goto seq_keys_loop_end
 				end
 			end
 			-- try to save load time:
 			if not	ii_has_ext
 			and (	#tbl_key_ii > 0
-			or	str_find( jj_key_seq, "%S[:-]%S"))
+			or	string.find( jj_key_seq, "%S[:]%S"))
 			then	ii_has_ext = true
 			end
-			tbl_key_ii[#tbl_key_ii + 1] = str_gsub(jj_key_seq, "minus", "-")
+			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq:gsub("minus", "-"):gsub("plus", "+"), sep = jj_key_sep }
 			::seq_keys_loop_end::
 		end
 		local tbl_kxp_ii = { }
@@ -979,14 +980,14 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			for	jj, jj_key_seq in pairs(tbl_key_ii)
 			do
-				jj_key_base, jj_ext_mode = str_match(jj_key_seq, "^(.+):(.+)$")
+				jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
 				if	jj_ext_mode
 				then	-- here ext_mode supposed to be HLD or DBL
 					jj_ext_mode = tbl_ext_mode_code[jj_ext_mode]
-				else	jj_key_base = jj_key_seq
+				else	jj_key_base = jj_key_seq.key
 				end
 				local tbl_key_exp_jj = fnc_key_expand(jj_key_base, true, true)
-				tbl_kxp_ii[#tbl_kxp_ii + 1] = { exp = tbl_key_exp_jj, bas = jj_key_base, ext = jj_ext_mode, key = jj_key_seq }
+				tbl_kxp_ii[#tbl_kxp_ii + 1] = { exp = tbl_key_exp_jj, bas = jj_key_base, ext = jj_ext_mode, key = jj_key_seq.key, sep = jj_key_seq.sep }
 				local tbl_scr_key = { [ii_key] = {
 					key_full = ii_key,
 					key_path = tbl_key_ii,
@@ -1052,7 +1053,7 @@ local function fnc_macro_ex_build_all()
 		local	ii_mcr_key = ii_mcr.key
 		if	ii_mcr_key
 		and not ii_mcr.keyregex
-		and	str_find(ii_mcr_key, "%S[:-]%S") -- %S(s) - any (non-)whitespace character
+		and	str_find(ii_mcr_key, "%S[:%-%+]%S") -- %S(s) - any (non-)whitespace character
 		then	fnc_macro_ex_check_one(ii_mcr)
 		end
 	end
