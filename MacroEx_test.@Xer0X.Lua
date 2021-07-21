@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.7.8",
+	version_mod	= "0.8.1",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -27,7 +27,7 @@ if not nfo then return end
 
 
 Macro { description = "test 123",
-	id = win.Uuid(win.Uuid()),
+--	id = win.Uuid(win.Uuid()),
 	area = "Editor",
 --	key = "LCtrlF9 RCtrlF9",
 --	key = "CtrlF9",
@@ -42,7 +42,7 @@ Macro { description = "test 123",
 }
 
 Macro { description = "test ABC",
-	id = win.Uuid(win.Uuid()),
+--	id = win.Uuid(win.Uuid()),
 	area = "Editor",
 --	key = "LCtrlF9 RCtrlF9",
 --	key = "CtrlF9",
@@ -71,8 +71,9 @@ for ii, ii_key in ipairs({
 	"RCtrlQ-RCtrlA-RCtrl-",		-- here final "-" is treated the conventional way
 	"RCtrlQ-CtrlA-Ctrl- RCtrlQ-CtrlA-LCtrl- RCtrlQ-CtrlA-RCtrl- CtrlAltA",
 	"ShiftF8-F8",
+	"CtrlShifta-AltA-Enter",
 	"CtrlF8-F9",
-	"CtrlF9-1-2-3-4-5",
+	"CtrlF9+1+2+3-4-5",
 	"CtrlK-J",
 	"RAltF1:Hold",
 	"CtrlAltF1:Hold",
@@ -102,9 +103,9 @@ for ii, ii_key in ipairs({
 	"LCtrlRAlt-Alt",
 	"LCtrlRAlt-F7-F6-F5",
 	"CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
-	"X-Y-Z", 
-	"X:Double-Y-Z", 
-	"X:Hold-Y-Z", 
+	"X-Y-Z",
+	"X:Double-Y-Z",
+	"X:Hold-Y-Z",
 	"CtrlS:Double-F3-F2-F1",
 	"CtrlS:Hold-F3-F2:Double-F1",
 	"CtrlS:Hold-F3-F2:Hold-F1",
@@ -114,11 +115,13 @@ for ii, ii_key in ipairs({
 	"AltEsc:Double-Space-A-B-C"
 })
 do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
-		id = win.Uuid(win.Uuid()),
+	--	id = win.Uuid(win.Uuid()),
 		area = "Editor Shell",
-		disabled = true,
+	--	disabled = true,
 		key = ii_key,
-		priority = ii, 
+		filemask = "*.lua.dat",
+		flags = "EVSelection",
+		priority = ii,
 		sortpriority = ii % 5;
 	--	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action = function() far.Message(ii_key, string.format("%s / %s / %s", mf.akey(1, 0), mf.akey(1, 1), AKey)) end
@@ -132,9 +135,11 @@ for ii, ii_key in ipairs({
 	test_mcr_key.."-"..test_mcr_key
 		})
 do	Macro {	description = ii_key.." (Common+Editor) MacroEx example",
-		id	= win.Uuid(win.Uuid()),
+	--	id	= win.Uuid(win.Uuid()),
 		area	= "Common Editor",
 		key	= ii_key,
+		filemask = "*.lua.dat",
+		flags = "EVSelection",
 		priority= 100,
 --		condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 		action	= function(mcr_src)
@@ -146,10 +151,12 @@ do	Macro {	description = ii_key.." (Common+Editor) MacroEx example",
 	}
 end
 
-Macro {	description = "CtrlF9-AltF9 (Viewer+Editor+Common) MacroEx example",
-	id = win.Uuid(win.Uuid()),
-	area = "Viewer Editor Common",
+Macro {	description = "CtrlF9-AltF9 (Viewer+Editor) MacroEx example",
+--	id = win.Uuid(win.Uuid()),
+	area = "Viewer Editor",
 	key = "CtrlF9-AltF9",
+	filemask = "*.lua.dat",
+	flags = "EVSelection",	
 	priority = 100,
 --	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description.." ("..Area.Current..")") end
