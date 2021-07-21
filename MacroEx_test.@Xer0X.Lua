@@ -117,7 +117,6 @@ for ii, ii_key in ipairs({
 do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 	--	id = win.Uuid(win.Uuid()),
 		area = "Editor Shell",
-	--	disabled = true,
 		key = ii_key,
 		filemask = "*.lua.dat",
 		flags = "EVSelection",
