@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.6",
+	version_mod	= "2.6.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -71,6 +71,10 @@ local C = far.Colors
 
 local KEY_EVENT = F.KEY_EVENT
 
+local MCODE_F_CHECKALL		= 0x80C64
+local MCODE_F_GETOPTIONS	= 0x80C65 
+local MCODE_F_MACROSETTINGS	= 0x80C6A
+
 local EVAL_SUCCESS       =  0
 local EVAL_SYNTAXERROR   = 11
 local EVAL_BADARGS       = -1
@@ -85,6 +89,7 @@ local EVAL_RES = {
 	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"	-- -3 было выведено меню выбора макроса, и пользователь его отменил
 	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR"	-- -4 макрос был прерван в результате ошибки времени исполнения
 }
+
 local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
 local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
 local LEFT_CTRL_PRESSED	= F.LEFT_CTRL_PRESSED
@@ -97,8 +102,10 @@ local MOD_MASK = bor(
 	RIGHT_CTRL_PRESSED,
 	SHIFT_PRESSED
 		)
+
 local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
 local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold"}
+
 local	Xer0X	= require("Lib-Common-@Xer0X")
 local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
 local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
@@ -129,17 +136,23 @@ local str_format= utf8.format
 local math_max	= math.max
 local tbl_concat= table.concat
 local tbl_insert= table.insert
+local tbl_sort	= table.sort
 local mf_waitkey= mf.waitkey
 local win_uuid	= win.Uuid
 
-local far_Message = far.Message
+local far_Message	=	far.Message
+local far_ProcessName	=	far.ProcessName
+local far_NameToInputRecord =	far.NameToInputRecord
 
 local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
 local KEY_STR_FMT	= "%s%s%s%s"
 local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local LoadedMacros	= Xer0X.utils.LoadedMacros
-local tbl_handlers	= { }
+local GetAreaCode	= Xer0X.utils_shared.GetAreaCode
+local MacroCallFar	= Xer0X.utils.MacroCallFar
+local utils_Areas	= Xer0X.utils.Areas
+local tbl_handlers = { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
 Xer0X.tbl_ext_key_lev_hist = { }
 local tbl_key_lev_hist = Xer0X.tbl_ext_key_lev_hist
@@ -164,8 +177,8 @@ local function fnc_combo_mod_try(key)
 	local	combo_mod,
 		combo_key = rgx_combo:match(key)
 	if	combo_mod
-	then	local	m = far.NameToInputRecord(combo_mod.."a")
-		local	k = far.NameToInputRecord(combo_key)
+	then	local	m = far_NameToInputRecord(combo_mod.."a")
+		local	k = far_NameToInputRecord(combo_key)
 		if	m
 		and	k
 		then	return{ ControlKeyState	= m.ControlKeyState,
@@ -175,7 +188,8 @@ local function fnc_combo_mod_try(key)
 end -- fnc_combo_mod_try
 
 local tbl_key_rec_cache = { } -- micro optimization
-local far_NameToInputRecord = function(the_key)
+Xer0X.tbl_key_inp_rec_cache = tbl_key_rec_cache
+local fnc_NameToInputRecord = function(the_key)
 	local	the_key_rec = tbl_key_rec_cache[the_key]
 	if	the_key_rec
 	then	return the_key_rec
@@ -185,8 +199,8 @@ local far_NameToInputRecord = function(the_key)
 	http://forum.farmanager.com/viewtopic.php?f=8&t=9357
 	Комбинация клавиш CtrlNumLock для системы означает VK_PAUSE, но фар об этом не знает.]]
 	local	key_inp_rec = str_match(the_key, "r?ctrlnumlock")
-			and	far.NameToInputRecord(	"Pause")
-			or	far.NameToInputRecord(	the_key)
+			and	far_NameToInputRecord(	"Pause")
+			or	far_NameToInputRecord(	the_key)
 			or	fnc_combo_mod_try(	the_key)
 	if not	key_inp_rec
 	then    if opts.DbgShowBadKey
@@ -256,7 +270,6 @@ local function fnc_key_parse(the_key, in_upper)
 		RLalt = RLalt and (in_upper and str_upper(RLalt) or str_lower(RLalt)),
 		shift = shift and (in_upper and str_upper(shift) or str_lower(shift)),
 		plain = plain and (in_upper and str_upper(plain) or str_lower(plain)),
-		plorc = plain 
 	}
 end
 
@@ -278,7 +291,7 @@ local function fnc_key_expand(the_key, in_lower, str_id, as_received )
 	ctl2 = ctl or obj_key.RLctl
 	alt2 = alt or obj_key.RLalt
 	key = obj_key.plain or ""
-	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key, koc = obj_key.plorc } 
+	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key  } 
 	tbl_key.vis	= str_lower(str_format(KEY_VIS_FMT,
 		ctl2 or 0,
 		alt2 or 0,
@@ -429,19 +442,15 @@ local function GetMacro(argKey, argUseCommon)
 		start = to and to + 1 or start
 		key = (ctrl or "")..(alt or "")..str_sub(key, start)
 	end
-	--[[ Create collector table: keys are macros, values are indexes into CInfo.
-	For each macro, CInfo stores 2 consecutive values: dynamic priority and found area.]]
 	local Collector, CInfo = { }, { }
-	-- Filter macros by filemask and flags. Put the "successful" ones in the collector.
 	local filename = false
 		or area_name == "editor" and editor.GetFileName()
 		or area_name == "viewer" and viewer.GetFileName()
 		or area_name == "shell"  and APanel.Path.."\\"..APanel.Current
 
 	local function ExamineMacro(m, area_name)
-		local check = not (filename and m.filemask)
-			or far.ProcessName("PN_CMPNAMELIST", m.filemask, filename, "PN_SKIPPATH")
-		if	check 
+		local check = not (filename and m.filemask) or far_ProcessName("PN_CMPNAMELIST", m.filemask, filename, "PN_SKIPPATH")
+		if check and MacroCallFar(MCODE_F_CHECKALL, GetAreaCode(area_name), m.flags, m.callback, m.callbackId)
 		then	if not	Collector[m]
 			then	local n = #CInfo + 1
 				Collector[m] = n
@@ -452,7 +461,7 @@ local function GetMacro(argKey, argUseCommon)
 	end -- ExamineMacro
 
 	for _, ii_areaname in ipairs(Area_Names)
-	do	local	ii_areatable = Xer0X.utils.Areas[ii_areaname]
+	do	local	ii_areatable = utils_Areas[ii_areaname]
 		if	ii_areatable
 		then	local	ii_macros = ii_areatable[key]
 			if	ii_macros
@@ -490,6 +499,7 @@ local function GetMacro(argKey, argUseCommon)
 	do	macrolist[#macrolist + 1] = { macro = ii_m, priority = CInfo[ii_p], sortpriority = ii_m.sortpriority }
 		if CInfo[ii_p] == max_priority then nindex = nindex and -1 or #macrolist end
 	end
+	-- Make order of macros in the menu consistent:
 	table.sort(macrolist, function(m1, m2) return Collector[m1.macro] < Collector[m2.macro] end)
 	return macrolist, nindex, Collector, CInfo
 end -- GetMacro
@@ -519,7 +529,7 @@ local function fnc_macro_key_check(key_scr)
 			end
 		end
 	end
-	table.sort(macrolist, function(m1, m2)
+	tbl_sort(macrolist, function(m1, m2)
 		local m1_prio = m1.priority	or 0
 		local m2_prio = m2.priority	or 0
 		local m1_sort = m1.sortpriority or 0
@@ -614,8 +624,8 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
 		key_ext		= obj_handler.key_ext,				
-		key_rec		= far_NameToInputRecord(key_str_bas),		
-		key_rec_act	= far_NameToInputRecord(key_str_bas),		
+		key_rec		= fnc_NameToInputRecord(key_str_bas),		
+		key_rec_act	= fnc_NameToInputRecord(key_str_bas),		
 		key_exp		= { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
 		key_time	= Far.UpTime,					
 	}
@@ -675,7 +685,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
-			local	key_rec_new = far_NameToInputRecord(key_str_new) -- real
+			local	key_rec_new = fnc_NameToInputRecord(key_str_new) -- real
 			local	cas_mod_is_same =
 					-- for keys like Ctrl, CtrlAlt, etc. we do not need same CAS state
 					({next(obj_key_lev.key_exp)})[2].key == "" or
@@ -693,7 +703,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			local	plain_tried, same_cas_tried
 			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, "in_lower", "real_key_str", "received")
 			::seq_key_try::
-			local	key_rec_try = far_NameToInputRecord(key_str_try) -- real
+			local	key_rec_try = fnc_NameToInputRecord(key_str_try) -- real
 			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, "in_lower", "real_key_str", "received")
 			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
 			if not	key_str_seq
@@ -799,7 +809,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			break
 		end
 		--[[ HUGE TODO: make here conditioning, but, actually,
-		this check should be immediatly in the new sequence key analize and receive block]]
+		this check should be immediatly in the new sequence key receive and analize block ]]
 		if  not obj_key_lev.key_ext.SEQ	-- no sequences
 		and not obj_key_lev.key_ext.EXT -- no extensions to wait
 		then	tbl_key_lev.stop_cause	= "no-ext-seq"
@@ -945,11 +955,10 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_handlers_loc = { }
 	local mcr_id_ext = str_upper(win_uuid(win_uuid()))
 	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s", true))
-	do	local obj_mcr_ii = { [ii_key] = { obj_mcr } }
+	do	local ii_has_ext
 		local tbl_key_ii = { }
 		local tbl_ext_ii = { }
 		local tbl_ext_jj = tbl_ext_ii
-		local ii_has_ext
 		for jj_key_seq, jj_key_sep in str_gmatch(ii_key, "([^-+]*)([-+]?)") 
 		do
 			if	jj_key_seq == ""
@@ -972,14 +981,14 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq, sep = jj_key_sep }
 			::seq_keys_loop_end::
-		end
+		end 
 		if not	ii_has_ext
 		then	goto enum_full_keys_loop_end
 		end
-		local tbl_scr_key_ii = { [ii_key] = {
-			key_full = ii_key,
-			key_path = tbl_key_ii,
-			scripts = { [mcr_id_ext] = obj_mcr }
+		local tbl_scr_key_ii = { [ii_key] = { 
+			key_full = ii_key, 
+			key_path = tbl_key_ii, 
+			scripts = { [mcr_id_ext] = obj_mcr } 
 		} }
 		for	jj, jj_key_seq in pairs(tbl_key_ii)
 		do	jj_key_seq.key = jj_key_seq.key:gsub("minus", "-"):gsub("plus", "+") -- normalize orig key string
@@ -996,7 +1005,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				else	if opts.DbgShowBadExt
 					then fnc_err_msg(str_format("wrong extension %s in sequence %s", jj_ext_mode, ii_key))
 					end
-					goto enum_full_keys_loop_end -- cancel sequences with bad extension
+					goto enum_full_keys_loop_end -- cancel sequences with an unacceptable extension
 				end
 			else	jj_key_seq.bas = jj_key_seq.key
 			end
@@ -1026,7 +1035,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		end
 		obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- should be only once
 		for ll, ll_area in pairs(obj_mcr.data.areas_work) do
-		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii)	do
+		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii) do
 			tbl_handlers_loc[ll_area][mm_ext_key] = fnc_key_handler_set(ll_area, mm_ext_obj, obj_mcr)
 		end end
 		::enum_full_keys_loop_end::
@@ -1039,12 +1048,11 @@ end -- fnc_macro_ex_check_one
 
 local function fnc_macro_ex_build_all()
 	local t1 = Far.UpTime
-	for ii = 1, #LoadedMacros
-	do	local	ii_mcr = LoadedMacros[ii]
-		local	ii_mcr_key = ii_mcr.key
-		if	ii_mcr_key
+	for ii = 1, #LoadedMacros 
+	do	local	ii_mcr = LoadedMacros[ii] 
+		if	ii_mcr.key
 		and not ii_mcr.keyregex
-		and	str_find(ii_mcr_key, "%S[:%-%+]%S") -- %S(s) - any (non-)whitespace character
+		and	str_find(ii_mcr.key, "%S[:%-%+]%S") -- %S(s) - any (non-)whitespace character
 		then	fnc_macro_ex_check_one(ii_mcr)
 		end
 	end
