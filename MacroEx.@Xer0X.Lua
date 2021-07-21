@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.6.2",
+	version_mod	= "2.6.3",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -448,14 +448,14 @@ local function GetMacro(argKey, argUseCommon)
 		or area_name == "viewer" and viewer.GetFileName()
 		or area_name == "shell"  and APanel.Path.."\\"..APanel.Current
 
-	local function ExamineMacro(m, area_name)
+	local function ExamineMacro(m, area_name_test)
 		local check = not (filename and m.filemask) or far_ProcessName("PN_CMPNAMELIST", m.filemask, filename, "PN_SKIPPATH")
-		if check and MacroCallFar(MCODE_F_CHECKALL, GetAreaCode(area_name), m.flags, m.callback, m.callbackId)
+		if check and MacroCallFar(MCODE_F_CHECKALL, GetAreaCode(area_name_test), m.flags, m.callback, m.callbackId)
 		then	if not	Collector[m]
 			then	local n = #CInfo + 1
 				Collector[m] = n
 				CInfo[n] = m.priority or 50
-				CInfo[n + 1] = area_name
+				CInfo[n + 1] = area_name_test
 			end
 		end
 	end -- ExamineMacro
@@ -467,8 +467,10 @@ local function GetMacro(argKey, argUseCommon)
 			if	ii_macros
 			then	for _, jj_m in ipairs(ii_macros)
 				do	if not	jj_m.disabled
-					then
-						ExamineMacro(jj_m, ii_areaname)
+					and	jj_m.data.areas_dict[ii_areaname]
+					and not(ii_areaname == "common"		
+					and	jj_m.data.areas_dict[area_name])
+					then	ExamineMacro(jj_m, ii_areaname) 
 					end
 				end
 			end
@@ -979,14 +981,14 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq, sep = jj_key_sep }
 			::seq_keys_loop_end::
-		end 
+		end
 		if not	ii_has_ext
 		then	goto enum_full_keys_loop_end
 		end
-		local tbl_scr_key_ii = { [ii_key] = { 
-			key_full = ii_key, 
-			key_path = tbl_key_ii, 
-			scripts = { [mcr_id_ext] = obj_mcr } 
+		local tbl_scr_key_ii = { [ii_key] = {
+			key_full = ii_key,
+			key_path = tbl_key_ii,
+			scripts = { [mcr_id_ext] = obj_mcr }
 		} }
 		for	jj, jj_key_seq in pairs(tbl_key_ii)
 		do	jj_key_seq.key = jj_key_seq.key:gsub("minus", "-"):gsub("plus", "+") -- normalize orig key string
@@ -1023,19 +1025,23 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			obj_mcr.data.areas_arr = fnc_str_split(str_lower(obj_mcr.area), "%s+", true)
 			obj_mcr.data.areas_dict = { }
 			for mm, mm_area in pairs(obj_mcr.data.areas_arr)
-			do	obj_mcr.data.areas_dict[mm_area] = true
-				if not	tbl_handlers_loc[mm_area]
-				then	tbl_handlers_loc[mm_area] = { }
-				end
+			do obj_mcr.data.areas_dict[mm_area] = true
 			end
 			obj_mcr.data.areas_work = obj_mcr.data.areas_dict.common and { "common" } or obj_mcr.data.areas_arr
 			obj_mcr.data.key_seq_all = { }
 		end
 		obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- should be only once
-		for ll, ll_area in pairs(obj_mcr.data.areas_work) do
-		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii) do
-			tbl_handlers_loc[ll_area][mm_ext_key] = fnc_key_handler_set(ll_area, mm_ext_obj, obj_mcr)
-		end end
+		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii)
+		do	local areas_work =
+				tbl_handlers.common and tbl_handlers.common[mm_ext_key] and { "common" }
+				or obj_mcr.data.areas_work
+			for ll, ll_area in pairs(areas_work)
+			do	if not	tbl_handlers_loc[ll_area]
+				then	tbl_handlers_loc[ll_area] = { }
+				end
+				tbl_handlers_loc[ll_area][mm_ext_key] = fnc_key_handler_set(ll_area, mm_ext_obj, obj_mcr)
+			end
+		end
 		::enum_full_keys_loop_end::
 	end
 	if	create_handlers
