@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.6.3",
+	version_mod	= "2.7.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -51,7 +51,7 @@ local nfo = Info({
 		},
 		DbgShowBadExt	= false,
 		DbgShowBadKey	= false,
-		DbgShowLoadTime	= false,
+		DbgShowLoadTime	= true,
 	}
 })
 if not nfo then return end
@@ -140,13 +140,10 @@ local tbl_sort	= table.sort
 local mf_waitkey= mf.waitkey
 local win_uuid	= win.Uuid
 
-local far_Message	=	far.Message
-local far_ProcessName	=	far.ProcessName
-local far_NameToInputRecord =	far.NameToInputRecord
+local far_Message		= far.Message
+local far_ProcessName		= far.ProcessName
+local far_NameToInputRecord	= far.NameToInputRecord
 
-local KEY_VIS_FMT	= "c:%s/a:%s/s:%s/p:%s"
-local KEY_STR_FMT	= "%s%s%s%s"
-local KEY_CAS_FMT	= "%s%s%s"
 local obj_status	= Xer0X.obj_screen_status_line
 local LoadedMacros	= Xer0X.utils.LoadedMacros
 local GetAreaCode	= Xer0X.utils_shared.GetAreaCode
@@ -154,8 +151,8 @@ local MacroCallFar	= Xer0X.utils.MacroCallFar
 local utils_Areas	= Xer0X.utils.Areas
 local tbl_handlers = { }
 Xer0X.tbl_macro_ex_handlers = tbl_handlers
-Xer0X.tbl_ext_key_lev_hist = { }
-local tbl_key_lev_hist = Xer0X.tbl_ext_key_lev_hist
+local tbl_key_lev_hist = { }
+Xer0X.tbl_ext_key_lev_hist = tbl_key_lev_hist
 local tbl_normal_ask__load = loadfile(own_fpath..".dat")
 local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
 local vkc_no_repeat, flg_ext_mod_off	-- to disable handler in order to run an original macro
@@ -177,8 +174,8 @@ local function fnc_combo_mod_try(key)
 	local	combo_mod,
 		combo_key = rgx_combo:match(key)
 	if	combo_mod
-	then	local	m = far_NameToInputRecord(combo_mod.."a")
-		local	k = far_NameToInputRecord(combo_key)
+	then	local	m = far.NameToInputRecord(combo_mod.."a")
+		local	k = far.NameToInputRecord(combo_key)
 		if	m
 		and	k
 		then	return{ ControlKeyState	= m.ControlKeyState,
@@ -262,62 +259,84 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 	return tbl_res
 end
 
-local rgx_key_parse = regex.new("/^(?:([rl]?)ctrl)?(?:([rl]?)alt)?(shift)?(.+)?$/i")
-local function fnc_key_parse(the_key, in_upper)
-	local RLctl, RLalt, shift, plain = rgx_key_parse:match(the_key) 
-	return { 
-		RLctl = RLctl and (in_upper and str_upper(RLctl) or str_lower(RLctl)),
-		RLalt = RLalt and (in_upper and str_upper(RLalt) or str_lower(RLalt)),
-		shift = shift and (in_upper and str_upper(shift) or str_lower(shift)),
-		plain = plain and (in_upper and str_upper(plain) or str_lower(plain)),
-	}
-end
 
-local function fnc_key_expand(the_key, in_lower, str_id, as_received )
+local tbl_parsed_keys_val_cache = { }
+Xer0X.tbl_parsed_keys_val_cache = tbl_parsed_keys_val_cache
+local tbl_parsed_keys_bad_cache = { }
+Xer0X.tbl_parsed_keys_bad_cache = tbl_parsed_keys_bad_cache
+local rgx_key_parse_v2 = regex.new("/^(l?ctrl)?(rctrl)?(l?alt)?(ralt)?(shift)?(.+)?$/i")
+local function fnc_key_parse(the_key)
+	local	obj_parsed = tbl_parsed_keys_val_cache[the_key]
+	if	obj_parsed
+	then	return obj_parsed
+	end
+	if	tbl_parsed_keys_bad_cache[the_key]
+	then	return false
+	end	
+	local the_key_low = string.lower(the_key)
+	local t_rec_1 = { }
+	t_rec_1.ctl_l, t_rec_1.ctl_r, t_rec_1.alt_l, t_rec_1.alt_r, t_rec_1.shift, t_rec_1.plain = rgx_key_parse_v2:match(the_key_low)
+	local t_rec_2 = { }
+	if not t_rec_1.plain then goto after_validity_check end
+	t_rec_2.ctl_l, t_rec_2.ctl_r, t_rec_2.alt_l, t_rec_2.alt_r, t_rec_2.shift, t_rec_2.plain = rgx_key_parse_v2:match(t_rec_1.plain)
+	if	t_rec_2.ctl_l
+	or	t_rec_2.ctl_r
+	or	t_rec_2.alt_l
+	or	t_rec_2.alt_r
+	or	t_rec_2.shift
+	then	tbl_parsed_keys_bad_cache[the_key] = { t_rec_1, t_rec_2 }
+		return false
+	end
+	::after_validity_check::
+	t_rec_1.ctl_x = not t_rec_1.ctl_r and t_rec_1.ctl_l and str_lower(t_rec_1.ctl_l) == "ctrl"
+	t_rec_1.alt_x = not t_rec_1.alt_r and t_rec_1.alt_l and str_lower(t_rec_1.alt_l) == "alt"
+	t_rec_1.ctl_e = t_rec_1.ctl_r or t_rec_1.ctl_l
+	t_rec_1.alt_e = t_rec_1.alt_r or t_rec_1.alt_l
+	tbl_parsed_keys_val_cache[the_key] = t_rec_1
+	return t_rec_1
+end -- fnc_key_parse
+
+local tbl_key_expanded_cache = { }
+Xer0X.tbl_key_expanded_cache = tbl_key_expanded_cache 
+local function fnc_key_expand(the_key, in_lower, as_single )
 	if not the_key then return end
+	local key_cache = str_format("%s|%s|%s", the_key, tostring(in_lower), tostring(as_single))
+	local obj_cache = tbl_key_expanded_cache[key_cache]
+	if obj_cache then return unpack(tbl_key_expanded_cache[key_cache]) end
 --	assert(key:match("^%l+$"))
 	local R =	in_lower and "r"	or "R"
 	local L	=	in_lower and "l"	or "L"
 	local ALT =	in_lower and "alt"	or "Alt"
 	local CTL =	in_lower and "ctrl"	or "Ctrl"
 	local NONE=	in_lower and "<none>"	or "<NONE>"
-	local obj_key = fnc_key_parse(the_key) 
+	local obj_key = fnc_key_parse(in_lower and str_lower(the_key) or the_key) 
 	local tbl_exp = { }
-	local ctl, alt, sft, ctl2, alt2, key
-	ctl = obj_key.RLctl == "" and L
+	ctl = obj_key.ctl_x and L
 	repeat
-	alt = obj_key.RLalt == "" and L
+	alt = obj_key.alt_x and L
 	repeat
-	ctl2 = ctl or obj_key.RLctl
-	alt2 = alt or obj_key.RLalt
-	key = obj_key.plain or ""
-	local tbl_key = { ctl = ctl2, alt = alt2, sft = obj_key.shift, key = key  } 
-	tbl_key.vis	= str_lower(str_format(KEY_VIS_FMT,
-		ctl2 or 0,
-		alt2 or 0,
-		obj_key.shift and 1 or 0,
-		obj_key.plain or NONE))
-	tbl_key.str	= str_format(KEY_STR_FMT,
-		ctl2 and ctl2..CTL or "",
-		alt2 and alt2..ALT or "",
-		obj_key.shift or "", key)
-	tbl_key.rec	= str_format(KEY_STR_FMT,
-		ctl2 and (ctl2 == R and R or "")..CTL or "",
-		alt2 and (alt2 == R and R or "")..ALT or "",
-		obj_key.shift or "", key)
-	tbl_key.rec_cas = str_format(KEY_STR_FMT,
-		ctl2 and (ctl2 == R and R or "")..CTL or "",
-		alt2 and (alt2 == R and R or "")..ALT or "",
-		obj_key.shift or "", "")
-	tbl_key.cas	= str_format(KEY_CAS_FMT,
-		ctl2 and ctl2..CTL or "",
-		alt2 and alt2..ALT or "",
-		obj_key.shift or "")
-	tbl_exp[str_id and tbl_key.str or tbl_key.vis] = tbl_key
-	alt = str_lower(alt or "") == L and not as_received and R 
+	local tbl_key = { 
+		ctl_l = not ctl and not not obj_key.ctl_l or ctl == L,
+		ctl_r = not ctl and not not obj_key.ctl_r or ctl == R,
+		alt_l = not alt and not not obj_key.alt_l or alt == L,
+		alt_r = not alt and not not obj_key.alt_r or alt == R,
+		shift = obj_key.shift, 
+		plain = obj_key.plain
+	}
+	tbl_key.cas =	(ctl and ctl..CTL or (obj_key.ctl_l and L..CTL or "")..(obj_key.ctl_r and R..CTL or ""))..
+			(alt and alt..ALT or (obj_key.alt_l and L..ALT or "")..(obj_key.alt_r and R..ALT or ""))..
+			(obj_key.shift or "")
+	tbl_key.rec_cas=(ctl and (ctl == R and R or "")..CTL or (obj_key.ctl_l and L..CTL or "")..(obj_key.ctl_r and R..CTL or ""))..
+			(alt and (alt == R and R or "")..ALT or (obj_key.alt_l and L..ALT or "")..(obj_key.alt_r and R..ALT or ""))..
+			(obj_key.shift or "")
+	tbl_key.str = tbl_key.cas	..(obj_key.plain or "")
+	tbl_key.rec = tbl_key.rec_cas	..(obj_key.plain or "")
+	tbl_exp[tbl_key.str] = tbl_key
+	alt = not as_single and alt == L and R
 	until not alt
-	ctl = str_lower(ctl or "") == L and not as_received and R 
+	ctl = not as_single and ctl == L and R
 	until not ctl
+	tbl_key_expanded_cache[key_cache] = { tbl_exp, obj_key }
 	return tbl_exp, obj_key
 end -- fnc_key_expand
 
@@ -328,8 +347,8 @@ local function fnc_key_equal(key_base, key_comp)
 	or	key_comp == ""
 	then	return
 	end
-	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, true)
-	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, true)
+	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, true, false)
+	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, true, false)
 	for ii_base, ii_base_val in pairs(tbl_base) do
 	for ii_comp, ii_comp_val in pairs(tbl_comp) do
 	if	str_lower(ii_base)
@@ -701,10 +720,10 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			end
 			local	key_str_try = key_str_new
 			local	plain_tried, same_cas_tried
-			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, "in_lower", "real_key_str", "received")
+			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, true, true)
 			::seq_key_try::
 			local	key_rec_try = fnc_NameToInputRecord(key_str_try) -- real
-			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, "in_lower", "real_key_str", "received")
+			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, true, true)
 			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, key_ext.SEQ)
 			if not	key_str_seq
 			and not plain_tried
@@ -1009,7 +1028,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 				end
 			else	jj_key_seq.bas = jj_key_seq.key
 			end
-			jj_key_seq.exp = fnc_key_expand(jj_key_seq.bas, true, true) -- unified complex key in lower case
+			jj_key_seq.exp = fnc_key_expand(jj_key_seq.bas, true, false) -- unified complex key in lower case
 			for kk_str, kk_val in pairs(jj_key_seq.exp)
 			do 	tbl_ext_jj[kk_str] = { EXT = jj_key_seq.ext and true, KXP = kk_val, SCP = tbl_scr_key_ii }
 				if	jj_key_seq.ext
@@ -1064,6 +1083,9 @@ local function fnc_macro_ex_build_all()
 	if opts.DbgShowLoadTime
 	then far_Message(Far.UpTime - t1, "extended keys load time")
 	end
+	if not	Xer0X.fnc_macro_ex_build_all
+	then	Xer0X.fnc_macro_ex_build_all = fnc_macro_ex_build_all	 
+	end	
 	return tbl_handlers
 end -- fnc_macro_ex_build_all
 
