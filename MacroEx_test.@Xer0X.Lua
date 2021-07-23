@@ -14,7 +14,7 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.8.1",
+	version_mod	= "0.8.2",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -29,6 +29,7 @@ if not nfo then return end
 Macro { description = "test 123",
 --	id = win.Uuid(win.Uuid()),
 	area = "Editor",
+--	key = "RCtrlAltRAltA RCtrlAltRAltB RCtrlAltRAlt",
 --	key = "LCtrlF9 RCtrlF9",
 --	key = "CtrlF9",
 --	key = "LCtrlF9",
@@ -57,14 +58,10 @@ Macro { description = "test ABC",
 }
 
 for ii, ii_key in ipairs({
---	"LCtrl--x",			-- LCtrl-,then X
 	"LCtrlMinus-X",			-- LCtrl-,then X
---	"LCtrl---",			-- LCtrl-,then -
 	"LCtrlMinus-Minus",		-- LCtrl-,then -
---	"LCtrl--",			-- LCtrl, then -
 	"LCtrl-Minus",			-- LCtrl, then -
 	"RCtrl-Minus-F2",		-- RCtrl, then -, then F2
---	"RCtrl----F1",			-- RCtrl-,then -, then F1
 	"RCtrlMinus-Minus-F1",		-- RCtrl-,then -, then F1
 	"RCtrlMinus-Minus-Minus-Minus", -- RCtrl-,then -, then -, then -
 	"RCtrl-minus-minus-minus",	-- RCtrl, then -, then -, then -
@@ -94,15 +91,16 @@ for ii, ii_key in ipairs({
 	"CtrlAlt-CtrlAlt",
 	"CtrlRAlt-LCtrlRAlt-F8",
 	"CtrlLAlt:Hold",
-	"CtrlAlt:Hold",
+--	"CtrlAlt:Hold",
 	"CtrlRAlt:Hold-F3-F2-F1",
 	"RCtrlRAlt:Double",
 	"CtrlAlt:Double",
 	"RCtrlAlt-Alt",
 	"CtrlAlt-Alt",
-	"LCtrlRAlt-Alt",
-	"LCtrlRAlt-F7-F6-F5",
+--	"LCtrlRAlt-Alt",
+--	"LCtrlRAlt-F7-F6-F5",
 	"CtrlAlt-F3-F3-F3 LCtrlLAlt:Double-F4-F4-F4-F4",
+	"LCtrlRAlt:Hold-CtrlRCtrl-CtrlRCtrlAlt",
 	"X-Y-Z",
 	"X:Double-Y-Z",
 	"X:Hold-Y-Z",
@@ -153,7 +151,7 @@ end
 Macro {	description = "CtrlF9-AltF9 (Viewer+Editor) MacroEx example",
 --	id = win.Uuid(win.Uuid()),
 	area = "Viewer Editor",
-	key = "CtrlF9-AltF9",
+	key = "CtrlF9-AltF9 RCtrlAltRAltB:Double",
 	filemask = "*.lua.dat",
 	flags = "EVSelection",	
 	priority = 100,
