@@ -14,12 +14,13 @@ local nfo = Info {
 	id		= "931E8931-11D0-4FD9-B493-657898578F1B",
 	parent_id	= "115C9534-8273-4F5A-94EB-E321D6DC8618",
 	version		= "3", 
-	version_mod	= "0.8.2",
+	version_mod	= "0.8.3",
 	author		= "JD",
 	author_mod	= "Xer0X",
 	url		= "http://forum.farmanager.com/viewtopic.php?f=15&t=8764",
 	url_mod		= "https://forum.farmanager.com/viewtopic.php?f=15&t=12459",
 	url_git		= "https://github.com/dr-dba/far-lua-key-efficiency",
+--	https://github.com/dr-dba/far-lua-key-efficiency/edit/main/MacroEx_test.@Xer0X.Lua
 --	disabled	= true;
 }
 
@@ -116,7 +117,7 @@ do	Macro { description = "Example MacroEx: "..ii_key.." (Editor+Shell)",
 	--	id = win.Uuid(win.Uuid()),
 		area = "Editor Shell",
 		key = ii_key,
-		filemask = "*.lua.dat",
+		filemask = "*.lua.dat;MacroEx_test.@Xer0X.lua",
 		flags = "EVSelection",
 		priority = ii,
 		sortpriority = ii % 5;
@@ -135,7 +136,7 @@ do	Macro {	description = ii_key.." (Common+Editor) MacroEx example",
 	--	id	= win.Uuid(win.Uuid()),
 		area	= "Common Editor",
 		key	= ii_key,
-		filemask = "*.lua.dat",
+		filemask = "*.lua.dat;MacroEx_test.@Xer0X.lua",
 		flags = "EVSelection",
 		priority= 100,
 --		condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
@@ -152,11 +153,14 @@ Macro {	description = "CtrlF9-AltF9 (Viewer+Editor) MacroEx example",
 --	id = win.Uuid(win.Uuid()),
 	area = "Viewer Editor",
 	key = "CtrlF9-AltF9 RCtrlAltRAltB:Double",
-	filemask = "*.lua.dat",
+	filemask = "*.lua.dat;MacroEx_test.@Xer0X.lua",
 	flags = "EVSelection",	
 	priority = 100,
 --	condition = function(the_key, mcr_dat) return false end, -- dynamic conditioning test
 	action = function(mcr_src) far.Message("You pressed "..(AKey or string.format("%s / %s", mf.akey(1, 0), mf.akey(1, 1))), mcr_src.description.." ("..Area.Current..")") end
 }
 
+if	Xer0X.fnc_macro_ex_build_all
+then	Xer0X.fnc_macro_ex_build_all()
+end
 -- @@@@@
