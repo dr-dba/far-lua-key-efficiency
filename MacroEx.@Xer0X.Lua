@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.8.1",
+	version_mod	= "2.9.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -197,17 +197,25 @@ local function fnc_is_holding(key_inp_rec) return vkc_no_repeat == key_inp_rec.V
 Event {	description = "MacroEx helper",
 	group = "ConsoleInput",
 	action = function(key_inp_rec)
+		local	vkc = key_inp_rec.VirtualKeyCode
+		local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
+		local	last_hist_key = last_hist and last_hist[#last_hist]
+		if	last_hist_key
+		and not last_hist.reset_hold
+		and	last_hist_key.ext_type == "HLD"
+		and	last_hist.run_mode == "ext-seq-run"
+		and	last_hist_key.key_rec.VirtualKeyCode ~= vkc
+		then	last_hist.reset_hold = vkc
+		end
 		if	vkc_no_repeat
 		and	key_inp_rec.EventType == KEY_EVENT
-		and	key_inp_rec.VirtualKeyCode ~= 0
+		and	vkc ~= 0
 		then	-- KEY_NONE? inp_rec.VirtualKeyCode == 0
 			-- prevent senseless repeating the same key
-			if	key_inp_rec.VirtualKeyCode == vkc_no_repeat
+			if	vkc == vkc_no_repeat
 			and	key_inp_rec.KeyDown
-			then	-- eat repetitions
-				return 1
-			else
-				vkc_no_repeat = false
+			then	return 1 -- eat repetitions
+			else	vkc_no_repeat = false
 			end
 		end
 	end
@@ -632,7 +640,17 @@ local function runMacroOrKey(the_key)
 end
 
 local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
-	if flg_ext_mod_off then return false end
+	if	flg_ext_mod_off 
+	then	return false 
+	end
+	local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
+	if	last_hist
+	and not last_hist.reset_hold
+	and	last_hist.run_mode == "ext-seq-run"
+	and	last_hist[#last_hist].ext_type == "HLD"
+	and	last_hist[#last_hist].key_str_act == rec_key
+	then	return false
+	end
 	obj_handler.prio_cond,
 	obj_handler.macrolist
 		= fnc_macro_key_check(obj_handler.key_ext.SCP, false)
@@ -832,6 +850,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			break
 		end
 	until false
+	tbl_key_lev.stop_time = Far.UpTime
 	far.RestoreScreen(obj_scr)
 	if	tbl_key_lev.run_mode == "ask-normal"
 	or	tbl_key_lev.run_mode == "run-normal"
@@ -912,6 +931,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		obj_status:set(str_format("%s sequence cancelled", obj_key_lev.key_str_seq), nil, 3000)
 	end
 	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev -- debug purposes only
+	tbl_key_lev.exit_time = Far.UpTime
 end -- fnc_hnd_mcr_action
 
 -- register hotkey's handler, here keys and areas should be already normalized to lower case
