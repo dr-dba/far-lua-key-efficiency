@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.9.0",
+	version_mod	= "2.9.2",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -198,14 +198,21 @@ Event {	description = "MacroEx helper",
 	group = "ConsoleInput",
 	action = function(key_inp_rec)
 		local	vkc = key_inp_rec.VirtualKeyCode
+		local	evt = key_inp_rec.EventType
 		local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
 		local	last_hist_key = last_hist and last_hist[#last_hist]
-		if	last_hist_key
+		if	vkc
+		and	evt == KEY_EVENT
+		and	last_hist_key
 		and not last_hist.reset_hold
 		and	last_hist_key.ext_type == "HLD"
 		and	last_hist.run_mode == "ext-seq-run"
-		and	last_hist_key.key_rec.VirtualKeyCode ~= vkc
-		then	last_hist.reset_hold = vkc
+		then	if	last_hist_key.key_rec.VirtualKeyCode == vkc 
+			then	return 1
+			else	key_inp_rec.KeyTime = Far.UpTime 
+				key_inp_rec.KeyExitDeltaTime = key_inp_rec.KeyTime - last_hist.exit_time
+				last_hist.reset_hold = key_inp_rec
+			end
 		end
 		if	vkc_no_repeat
 		and	key_inp_rec.EventType == KEY_EVENT
@@ -639,16 +646,23 @@ local function runMacroOrKey(the_key)
 	return	eval_res
 end
 
-local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
-	if	flg_ext_mod_off 
-	then	return false 
-	end
+local function fnc_eat_hld_rep_outer(rec_key)
 	local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
-	if	last_hist
+	local	last_hist_key = last_hist and last_hist[#last_hist]
+	if	last_hist_key
 	and not last_hist.reset_hold
 	and	last_hist.run_mode == "ext-seq-run"
-	and	last_hist[#last_hist].ext_type == "HLD"
-	and	last_hist[#last_hist].key_str_act == rec_key
+	and	last_hist_key.ext_type == "HLD"
+	and	last_hist_key.key_str_act == rec_key
+	then	return true
+	end
+end
+
+Xer0X.fnc_eat_hld_rep_outer = fnc_eat_hld_rep_outer
+
+local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
+	if	flg_ext_mod_off
+	or	fnc_eat_hld_rep_outer(rec_key)
 	then	return false
 	end
 	obj_handler.prio_cond,
@@ -682,6 +696,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 	}
 	local tbl_key_lev = { obj_key_lev, run_mode = "ask-normal" } -- init
 	local t_last_key = obj_key_lev.key_time
+	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev
 	obj_key_lev.mcr_all, obj_key_lev.mcr_fin = fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq, false)
 	obj_key_lev.hlp_str = fnc_get_seq_hlp(obj_key_lev, tbl_key_seq)
 	obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
@@ -903,7 +918,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				nil, 2500)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
-			do local run_res = runMacroOrKey(obj_waitkeys.keys[ii])
+			do runMacroOrKey(obj_waitkeys.keys[ii])
 			end
 			flg_ext_mod_off = false
 		else
@@ -914,23 +929,20 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		tbl_key_lev.run_mode == "ext-seq-run"
 	then
 		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 1000000)
-		local	eval_ok, eval_res = runMacro(obj_key_lev.key_str_seq)
-		if not	eval_ok
-		and	eval_res == -2
+		tbl_key_lev.eval_ok, tbl_key_lev.eval_res = runMacro(obj_key_lev.key_str_seq)
+		if not	tbl_key_lev.eval_ok
+		and	tbl_key_lev.eval_res == -2
 		then -- just take the first macro object:
 			local scr_num, scr_obj = next(obj_key_lev.mcr_fin)
-			eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
-			eval_ok = eval_res ~= EVAL_MACRONOTFOUND
-			--[[ TODO: upon unsuccess when macro not found especiallly,
-			probably we should suggest ask for running rormal? ]]
+			tbl_key_lev.eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
+			tbl_key_lev.eval_ok = tbl_key_lev.eval_res ~= EVAL_MACRONOTFOUND
 		end
-		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq, eval_res, EVAL_RES[eval_res]), nil, 3000)
+		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq, tbl_key_lev.eval_res, EVAL_RES[tbl_key_lev.eval_res]), nil, 3000)
 	elseif
 		tbl_key_lev.run_mode == "run-cancel"
 	then
 		obj_status:set(str_format("%s sequence cancelled", obj_key_lev.key_str_seq), nil, 3000)
 	end
-	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev -- debug purposes only
 	tbl_key_lev.exit_time = Far.UpTime
 end -- fnc_hnd_mcr_action
 
