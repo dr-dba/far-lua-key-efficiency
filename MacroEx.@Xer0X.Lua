@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "2.9.2",
+	version_mod	= "3.1.0",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -48,17 +48,15 @@ local nfo = Info({
 		ext_modes 	= {
 			HLD = true, -- holding
 			DBL = true, -- double
+			STT = true, -- state
 		},
 		DbgShowBadExt	= false,
 		DbgShowBadKey	= false,
-		DbgShowLoadTime	= true,
+		DbgShowLoadTime	= false,
 	}
 })
 if not nfo then return end
 local opts = nfo.options
-
--- @@@ END OF THE INFO AND OPTIONS BLOCK @@@
-
 local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
 local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
 local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
@@ -66,10 +64,73 @@ local OPT_DELAY_SEQ		= opts.DelaySeq
 local OPT_DELAY_HLP		= opts.DelayHlp
 local OPT_DELAY_EXT		= opts.DelayExt
 
+-- @@@ END OF THE INFO AND OPTIONS BLOCK @@@
+
 local F	= far.Flags
 local C = far.Colors
 
-local KEY_EVENT = F.KEY_EVENT
+local KEY_EVENT		= F.KEY_EVENT			
+local MOUSE_EVENT	= F.MOUSE_EVENT			
+local WND_BUF_SIZE_EVT	= F.WINDOW_BUFFER_SIZE_EVENT 	
+local MENU_EVENT	= F.MENU_EVENT			
+local FOCUS_EVENT	= F.FOCUS_EVENT			
+local ACTL_GETFARRECT	= F.ACTL_GETFARRECT
+local ACTL_GETCURSORPOS = F.ACTL_GETCURSORPOS
+local ACTL_SETCURSORPOS	= F.ACTL_SETCURSORPOS
+local ACTL_REDRAWALL	= F.ACTL_REDRAWALL
+local EOPT_SHOWTITLEBAR = F.EOPT_SHOWTITLEBAR
+local EOPT_SHOWKEYBAR	= F.EOPT_SHOWKEYBAR
+local EOPT_SHOWSCROLLBAR= F.EOPT_SHOWSCROLLBAR
+local DI_SINGLEBOX	= F.DI_SINGLEBOX
+local DI_TEXT		= F.DI_TEXT
+local FDLG_NONMODAL	= F.FDLG_NONMODAL
+local DN_CLOSE		= F.DN_CLOSE
+
+local str_lower = utf8.Utf8_lower	or utf8.lower
+local str_upper = utf8.Utf8_upper	or utf8.upper
+local str_gmatch= utf8.Utf8_gmatch	or utf8.gmatch
+local str_match = utf8.Utf8_match	or utf8.match
+local str_find	= utf8.Utf8_find	or utf8.find
+local str_gsub	= utf8.Utf8_gsub	or utf8.gsub
+local str_len	= utf8.Utf8_len		or utf8.len
+local str_rev	= utf8.reverse		or utf8.reverse
+local str_sub	= utf8.sub
+local str_cfind = utf8.cfind
+local str_format= utf8.format
+local str_fmt	= utf8.format
+local str_fmt_u	= utf8.format
+local str_fmt_s	= string.format
+local str_low_s = string.lower
+local str_low_a = string.lower
+local str_low	= string.lower
+local math_min	= math.min
+local math_max	= math.max
+local tbl_concat= table.concat
+local tbl_insert= table.insert
+local tbl_remove= table.remove
+local tbl_sort	= table.sort
+local tostr	= tostring
+local tostring	= tostring
+local io_open	= io.open
+local bit64_band= bit64.band
+
+local far_Message		= far.Message
+local far_ProcessName		= far.ProcessName
+local far_NameToInputRecord	= far.NameToInputRecord
+local far_InputRecordToName	= far.InputRecordToName
+local far_AdvControl		= far.AdvControl
+local far_Timer			= far.Timer
+local far_Text			= far.Text
+local mf_postmacro		= mf.postmacro
+local mf_waitkey		= mf.waitkey
+local win_uuid			= win.Uuid
+local win_GetKeyState		= win.GetKeyState
+local editor_GetInfo		= editor.GetInfo
+local panel_GetCmdLineSelection = panel.GetCmdLineSelection
+local panel_SetCmdLineSelection = panel.SetCmdLineSelection
+local panel_GetCmdLinePos	= panel.GetCmdLinePos
+local panel_SetCmdLinePos	= panel.SetCmdLinePos
+local panel_GetCmdLine		= panel.GetCmdLine
 
 local MCODE_F_CHECKALL		= 0x80C64
 local MCODE_F_GETOPTIONS	= 0x80C65 
@@ -95,6 +156,7 @@ local RIGHT_ALT_PRESSED	= F.RIGHT_ALT_PRESSED
 local LEFT_CTRL_PRESSED	= F.LEFT_CTRL_PRESSED
 local RIGHT_CTRL_PRESSED= F.RIGHT_CTRL_PRESSED
 local SHIFT_PRESSED	= F.SHIFT_PRESSED
+
 local MOD_MASK = bor(
 	LEFT_ALT_PRESSED,
 	RIGHT_ALT_PRESSED,
@@ -102,20 +164,7 @@ local MOD_MASK = bor(
 	RIGHT_CTRL_PRESSED,
 	SHIFT_PRESSED
 		)
-
-local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD" }
-local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold"}
-
-local	Xer0X	= require("Lib-Common-@Xer0X")
-local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
-local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
-if not	req_ok
-then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
-end
-local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
-local	FileName = ... or own_fpath
-
-
+local fnc_tbl_copy	= Xer0X.fnc_tbl_copy
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
 local fnc_tbl_count	= Xer0X.fnc_tbl_count
@@ -128,31 +177,45 @@ local GetAreaCode	= Xer0X.utils_shared.GetAreaCode
 local MacroCallFar	= Xer0X.utils.MacroCallFar
 local utils_Areas	= Xer0X.utils.Areas
 
-local str_lower = utf8.Utf8_lower	or utf8.lower
-local str_upper = utf8.Utf8_upper	or utf8.upper
-local str_gmatch= utf8.Utf8_gmatch	or utf8.gmatch
-local str_match = utf8.Utf8_match	or utf8.match
-local str_find	= utf8.Utf8_find	or utf8.find
-local str_gsub	= utf8.Utf8_gsub	or utf8.gsub
-local str_len	= utf8.Utf8_len		or utf8.len
-local str_sub	= utf8.sub
-local str_cfind = utf8.cfind
-local str_format= utf8.format
-local math_max	= math.max
-local tbl_concat= table.concat
-local tbl_insert= table.insert
-local tbl_sort	= table.sort
-local mf_waitkey= mf.waitkey
-local win_uuid	= win.Uuid
+local RLSD_KEYS_CHCK_TICK = 100
+local rlsd_keys_chck_last = Far.UpTime
 
-local far_Message		= far.Message
-local far_ProcessName		= far.ProcessName
-local far_NameToInputRecord	= far.NameToInputRecord
+local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD",	state = "STT"	}
+local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold",	STT = ":State"	}
 
-local tbl_handlers = { }
-Xer0X.tbl_macro_ex_handlers = tbl_handlers
-local tbl_key_lev_hist = { }
-Xer0X.tbl_ext_key_lev_hist = tbl_key_lev_hist
+local	Xer0X	= require("Lib-Common-@Xer0X")
+local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
+local	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LuaExplorer-@Xer0X")
+if not	req_ok
+then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
+end
+local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
+local	FileName = ... or own_fpath
+
+
+local tbl_hld_keys = { }
+Xer0X.tbl_hld_keys = tbl_hld_keys
+local tbl_key_states = { }
+Xer0X.tbl_key_states = tbl_key_states
+local tbl_macro_ex_handlers = { }
+Xer0X.tbl_macro_ex_handlers = tbl_macro_ex_handlers
+local tbl_ext_key_lev_hist = { }
+Xer0X.tbl_ext_key_lev_hist = tbl_ext_key_lev_hist
+local tbl_key_inp_rec_cache = { } -- micro optimization
+Xer0X.tbl_key_inp_rec_cache = tbl_key_inp_rec_cache
+local tbl_key_evt_journal = { [KEY_EVENT] = { }, [MOUSE_EVENT] = { }, [MENU_EVENT] = { }, [FOCUS_EVENT] = { }, [WND_BUF_SIZE_EVT] = { }, [0] = { }, ALL = { } }
+Xer0X.tbl_key_evt_journal = tbl_key_evt_journal
+local tbl_parsed_keys_val_cache = { }
+Xer0X.tbl_parsed_keys_val_cache = tbl_parsed_keys_val_cache
+local tbl_parsed_keys_bad_cache = { }
+Xer0X.tbl_parsed_keys_bad_cache = tbl_parsed_keys_bad_cache
+local tbl_key_mcr_journal = { }
+Xer0X.tbl_key_mcr_journal = tbl_key_mcr_journal
+local tbl_ext_seq_key_reg = { }
+Xer0X.tbl_ext_seq_key_reg = tbl_ext_seq_key_reg
+local tbl_key_expanded_cache = { }
+Xer0X.tbl_key_expanded_cache = tbl_key_expanded_cache
+
 local tbl_normal_ask__load = loadfile(own_fpath..".dat")
 local tbl_normal_ask = tbl_normal_ask__load and tbl_normal_ask__load() or { }
 local vkc_no_repeat, flg_ext_mod_off -- to disable handler in order to run an original macro
@@ -169,10 +232,8 @@ local function fnc_err_msg(msg, ...)
 	until	false
 end -- fnc_err_msg
 
-local tbl_key_rec_cache = { } -- micro optimization
-Xer0X.tbl_key_inp_rec_cache = tbl_key_rec_cache
 local fnc_NameToInputRecord = function(the_key)
-	local	the_key_rec = tbl_key_rec_cache[the_key]
+	local	the_key_rec = tbl_key_inp_rec_cache[the_key]
 	if	the_key_rec
 	then	return the_key_rec
 	end
@@ -187,46 +248,198 @@ local fnc_NameToInputRecord = function(the_key)
 	then    if opts.DbgShowBadKey
 		then fnc_err_msg(str_format("Unexpected AKey: %q", the_key))
 		end
-	else	tbl_key_rec_cache[the_key] = key_inp_rec
+	else	tbl_key_inp_rec_cache[the_key] = key_inp_rec
 	end
 	return key_inp_rec
+end
+
+Xer0X.fnc_NameToInputRecord = fnc_NameToInputRecord
+
+local function fnc_jrnl_inp_key_vis(j_rec)
+	return str_format("[%s] %s %s c:%s vkc:%s down:%s cks:%s", 
+		tostring(j_rec.key_rec.EventType), 
+		j_rec.area, j_rec.InpRecName or "<?>", 
+		tostring(j_rec.key_rec.UnicodeChar), 
+		tostring(j_rec.key_rec.VirtualKeyCode), 
+		tostring(j_rec.key_rec.KeyDown), 
+		tostring(j_rec.key_rec.ControlKeyState) 
+	)
+end
+
+local function fnc_con_inp_journal(key_inp_rec)
+	if Area.Menu and Menu.Id == "7646F761-8954-42CA-9CFC-E3F98A1C54D3" then return { } end
+	local rec_j, tbl_j
+	rec_j = { area = Area.Current, key_rec = key_inp_rec, key_time = Far.UpTime, p1 = p1, p2 = p2, _LEX_DISPLAY_STR = fnc_jrnl_inp_key_vis }
+	tbl_j = tbl_key_evt_journal.ALL
+	tbl_j[#tbl_j + 1] = rec_j
+	if #tbl_j > 1000 then tbl_remove(tbl_j, 1) end
+	tbl_j = tbl_key_evt_journal[key_inp_rec.EventType]
+	tbl_j[#tbl_j + 1] = rec_j
+	if #tbl_j > 1000 then tbl_remove(tbl_j, 1) end
+	return rec_j
+end
+
+local function fnc_key_state_run_remove(key_state, dt_now)
+	local	key_state_id = type(key_state) == "table" and key_state.key_state_id or key_state
+	local	key_state_obj= type(key_state) == "table" and key_state or tbl_key_states[key_state]
+	if	key_state_obj.fnc_state_final
+	then	key_state_obj:fnc_state_final(dt_now)
+	end
+	local	keys_run_normal	=  
+			key_state_obj.key_run_normal_if_state_was_not_used and 
+			key_state_obj.cnt_other_pressed == 0
+	for ii_key_name, ii_key_obj in pairs(key_state_obj.keys)
+	-- clean the state from all keys
+	do	ii_key_obj.states[key_state_id] = nil
+		if	keys_run_normal 
+		then
+			tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist].reset_hold = ii_key_name
+			mf_postmacro(Keys, ii_key_obj.key_name)
+		end
+	end
+	key_state_obj.is_closed = dt_now
+	key_state_obj.is_open = false
+	tbl_key_states[key_state_id] = nil
+	return key_state_obj, key_state_id
 end
 
 local function fnc_is_holding(key_inp_rec) return vkc_no_repeat == key_inp_rec.VirtualKeyCode end
 
 Event {	description = "MacroEx helper",
 	group = "ConsoleInput",
-	action = function(key_inp_rec)
-		local	vkc = key_inp_rec.VirtualKeyCode
-		local	evt = key_inp_rec.EventType
-		local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
-		local	last_hist_key = last_hist and last_hist[#last_hist]
-		if	vkc
-		and	evt == KEY_EVENT
-		and	last_hist_key
-		and not last_hist.reset_hold
-		and	last_hist_key.ext_type == "HLD"
-		and	last_hist.run_mode == "ext-seq-run"
-		then	if	last_hist_key.key_rec.VirtualKeyCode == vkc 
-			then	return 1
-			else	key_inp_rec.KeyTime = Far.UpTime 
-				key_inp_rec.KeyExitDeltaTime = key_inp_rec.KeyTime - last_hist.exit_time
-				last_hist.reset_hold = key_inp_rec
+	action = function(key_inp_rec, p1, p2)
+		local	j_rec	= fnc_con_inp_journal(key_inp_rec)
+		local	dt_now	= Far.UpTime
+		local	vkc, KeyDown, tbl_key_off
+		local	evt_type = key_inp_rec.EventType
+		if	evt_type == KEY_EVENT
+		then
+			vkc	= key_inp_rec.VirtualKeyCode
+			KeyDown = key_inp_rec.KeyDown
+			if	KeyDown
+			then	Xer0X.cnt_inp_key_press = (Xer0X.cnt_inp_key_press or 0) + 1
+			end
+			local	InpRecName = far_InputRecordToName(fnc_tbl_copy(key_inp_rec, { KeyDown = true }, true))
+			if	InpRecName
+			then	j_rec.InpRecName = InpRecName
+				local InpRecName_low = str_lower(InpRecName)
+				local key_is_on, key_toggle = win_GetKeyState(vkc)
+				for ii_key_name, ii_key_obj in pairs(tbl_hld_keys)
+				do	if	ii_key_obj.key_vcd == vkc
+					then 	ii_key_obj.key_is_on =	key_is_on
+						ii_key_obj.key_toggle =	key_toggle
+						if	KeyDown
+						then
+							ii_key_obj.cnt_state_pressed = (ii_key_obj.cnt_state_pressed or 0) + 1
+							ii_key_obj.dt_state_pressed = dt_now
+							if	ii_key_obj.eat_press_repeat
+							then	j_rec.suppress = true
+							end
+						else	-- KeyUp!
+							tbl_key_off = { [ii_key_obj.key_name_low] = ii_key_obj }
+							if	ii_key_obj.key_name_low ~= InpRecName_low
+							then	ii_key_obj.key_name_off  = InpRecName
+							end
+						end
+					else
+						if	KeyDown
+						then	ii_key_obj.cnt_other_pressed = (ii_key_obj.cnt_other_pressed or 0) + 1
+							ii_key_obj.dt_other_pressed = dt_now
+						end
+					end
+				end
+				for ii_stt_id, ii_stt_obj in pairs(tbl_key_states)
+				do	for jj_stt_key_name, jj_stt_key_obj in pairs(ii_stt_obj.keys)
+					do	local	key_belongs_to_state
+						if	jj_stt_key_obj.key_vcd == vkc
+						then	key_belongs_to_state = true
+							ii_stt_obj.cnt_state_pressed = (ii_stt_obj.cnt_state_pressed or 0) + 1
+							break
+						end
+						if not	key_belongs_to_state
+						then	ii_stt_obj.cnt_other_pressed = (ii_stt_obj.cnt_other_pressed or 0) + 1
+						end
+					end
+				end
+			end
+			local	last_hist = tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist]
+			local	last_hist_key = last_hist and last_hist[#last_hist]
+			if	vkc
+			and	last_hist_key
+			and not last_hist.reset_hold
+			and (	last_hist_key.ext_type == "HLD"
+			or	last_hist_key.ext_type == "STT")
+			and	last_hist.run_mode == "ext-seq-run"
+			then	if	last_hist_key.key_rec.VirtualKeyCode == vkc
+				then	j_rec.suppress = true
+				else	key_inp_rec.KeyTime = Far.UpTime 
+					key_inp_rec.KeyExitDeltaTime = last_hist.exit_time and key_inp_rec.KeyTime - last_hist.exit_time
+					key_inp_rec.KeyExecDeltaTime = last_hist.exec_time and key_inp_rec.KeyTime - last_hist.exec_time
+					last_hist.reset_hold = key_inp_rec
+				end
+			end
+			if	vkc_no_repeat
+			and	vkc ~= 0
+			then	-- KEY_NONE? inp_rec.VirtualKeyCode == 0
+				-- prevent senseless repeating the same key
+				if	vkc == vkc_no_repeat
+				and	key_inp_rec.KeyDown
+				then	return 1 -- eat repetitions
+				else	vkc_no_repeat = false
+				end
 			end
 		end
-		if	vkc_no_repeat
-		and	key_inp_rec.EventType == KEY_EVENT
-		and	vkc ~= 0
-		then	-- KEY_NONE? inp_rec.VirtualKeyCode == 0
-			-- prevent senseless repeating the same key
-			if	vkc == vkc_no_repeat
-			and	key_inp_rec.KeyDown
-			then	return 1 -- eat repetitions
-			else	vkc_no_repeat = false
+		if	dt_now - rlsd_keys_chck_last > RLSD_KEYS_CHCK_TICK
+		or	tbl_key_off -- due to KeyUp event above
+		then	rlsd_keys_chck_last = dt_now
+			if not next(tbl_hld_keys) then goto after_key_off_chk end
+			for ii_key_name, ii_key_obj in pairs(tbl_hld_keys)
+			do	if not (tbl_key_off -- again, due to KeyUp event above
+				and	tbl_key_off[ii_key_name])
+				and	ii_key_obj.key_vcd
+				then	ii_key_obj.key_is_on, ii_key_obj.key_toggle = win_GetKeyState(ii_key_obj.key_vcd)
+					if not 	ii_key_obj.key_is_on
+					then	if not tbl_key_off then tbl_key_off = { } end
+						tbl_key_off[ii_key_name] = ii_key_obj
+					else	-- same as for "if KeyDown"
+						ii_key_obj.cnt_state_checked = (ii_key_obj.cnt_state_checked or 0) + 1
+					        ii_key_obj.dt_state_checked = dt_now
+						if	ii_key_obj.states
+						then	for jj_stt_id, jj_stt_obj in pairs(ii_key_obj.states)
+							do	jj_stt_obj.dt_state_checked = dt_now
+								jj_stt_obj.cnt_state_checked = (jj_stt_obj.cnt_state_checked or 0) + 1
+								if	jj_stt_obj.fnc_state_repeat
+								and(not	jj_stt_obj.tick_state_repeat
+								or	jj_stt_obj.tick_state_repeat < dt_now - (ii_key_obj.dt_state_repeat or 0))
+								then	jj_stt_obj:fnc_state_repeat(dt_now)
+									jj_stt_obj.dt_state_repeat = dt_now
+								end
+							end
+						end
+					end
+				else
+				end
+			end			
+			if not tbl_key_off then goto after_key_off_chk end
+			local tbl_stt_off = { }
+			for ii_key_name, ii_key_obj in pairs(tbl_key_off)
+			do	ii_key_obj.is_closed = dt_now
+				ii_key_obj.is_open = false
+				tbl_hld_keys[ii_key_name] = nil
+				if	ii_key_obj.states
+				then	for ii_state_id, ii_state_obj in pairs(ii_key_obj.states)
+					do tbl_stt_off[ii_state_id] = ii_state_obj
+					end
+				end
 			end
+			for ii_state_id, ii_state_obj in pairs(tbl_stt_off)
+			do fnc_key_state_run_remove(ii_state_id, dt_now)
+			end			
+			::after_key_off_chk::
 		end
+		return j_rec.suppress
 	end
-}
+} 
 
 -- State after last mf.waitkey!!
 local function fnc_is_cas_mod_rls(key_rec)
@@ -259,10 +472,6 @@ local function fnc_macro_collect(tbl_keys) -- FIN/ALL/SCP
 end
 
 
-local tbl_parsed_keys_val_cache = { }
-Xer0X.tbl_parsed_keys_val_cache = tbl_parsed_keys_val_cache
-local tbl_parsed_keys_bad_cache = { }
-Xer0X.tbl_parsed_keys_bad_cache = tbl_parsed_keys_bad_cache
 local rgx_key_parse_v2 = regex.new("/^(l?ctrl)?(rctrl)?(l?alt)?(ralt)?(shift)?(.+)?$/i")
 local function fnc_key_parse(the_key)
 	local	obj_parsed = tbl_parsed_keys_val_cache[the_key]
@@ -295,8 +504,6 @@ local function fnc_key_parse(the_key)
 	return t_rec_1
 end -- fnc_key_parse
 
-local tbl_key_expanded_cache = { }
-Xer0X.tbl_key_expanded_cache = tbl_key_expanded_cache
 local function fnc_key_expand(the_key, in_lower, as_single )
 --	assert(key:match("^%l+$"))
 	if not the_key then return end
@@ -463,9 +670,9 @@ local function fnc_get_fin_scp(key_scr, prio_cond, tbl_key_seq, final_only)
 end -- fnc_get_fin_scp
 
 local function GetMacro(argKey, argUseCommon)
-	local area_name = str_lower(Area.Current)
+	local area_name = str_low_a(Area.Current)
 	local Area_Names = { area_name, argUseCommon and area_name ~= "common" and "common" or nil }
-	local key = argKey:lower()
+	local key = str_low_a(argKey) 
 	do 
 		local	from, to, ctrl, alt, start
 		do	from, to, ctrl = str_find(key, "^(r?ctrl)")
@@ -510,12 +717,22 @@ local function GetMacro(argKey, argUseCommon)
 		then	local	ii_macros = ii_areatable[key]
 			if	ii_macros
 			then	for _, jj_m in ipairs(ii_macros)
-				do	if not	jj_m.disabled
+				do	
+					if	jj_m.data.key_state_active_prevents_new
+					and	jj_m.data.key_states
+					then	for ii_key_stt_id, ii_key_stt_obj in pairs(jj_m.data.key_states)
+						do	if ii_key_stt_obj.is_open
+							then goto loop_cycle_end
+							end
+						end
+					end
+					if not	jj_m.disabled
 					and	jj_m.data.areas_dict[ii_areaname]
 					and not(ii_areaname == "common"		
 					and	jj_m.data.areas_dict[area_name])
 					then	ExamineMacro(jj_m, ii_areaname) 
 					end
+					::loop_cycle_end::
 				end
 			end
 		end
@@ -548,7 +765,7 @@ local function GetMacro(argKey, argUseCommon)
 	return macrolist, nindex, Collector, CInfo
 end -- GetMacro
 
-local function fnc_macro_key_check(key_scr)
+local function fnc_mcr_key_check(key_scr)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
 	local	tbl_mcr_key_ok = { }
 	local	macrolist = { }
@@ -557,7 +774,8 @@ local function fnc_macro_key_check(key_scr)
 		do	
 			local jj_mcr_list, mcr_hi_idx = GetMacro(jj_key_full, true)
 			for jj_mcr_idx, jj_mcr_obj in pairs(jj_mcr_list)
-			do	local	jj_mcr_itm = tbl_mcr_key_ok[jj_mcr_obj.macro.data.id_ext]
+			do
+				local	jj_mcr_itm = tbl_mcr_key_ok[jj_mcr_obj.macro.data.id_ext]
 				if not	jj_mcr_itm
 				then	jj_mcr_itm = { }
 					macrolist[#macrolist + 1] = jj_mcr_obj
@@ -586,7 +804,7 @@ local function fnc_macro_key_check(key_scr)
 		end
 	end)
 	return tbl_mcr_key_ok, macrolist
-end -- fnc_macro_key_check
+end -- fnc_mcr_key_check
 
 
 local obj_waitkeys = {
@@ -646,35 +864,102 @@ local function runMacroOrKey(the_key)
 	return	eval_res
 end
 
-local function fnc_eat_hld_rep_outer(rec_key)
-	local	last_hist = tbl_key_lev_hist[#tbl_key_lev_hist]	
+local function fnc_eat_hld_stt_rep_outer(rec_key)
+	local	last_hist = tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist]
 	local	last_hist_key = last_hist and last_hist[#last_hist]
 	if	last_hist_key
 	and not last_hist.reset_hold
 	and	last_hist.run_mode == "ext-seq-run"
-	and	last_hist_key.ext_type == "HLD"
+	and (	last_hist_key.ext_type == "HLD"
+	or	last_hist_key.ext_type == "STT" )
 	and	last_hist_key.key_str_act == rec_key
 	then	return true
 	end
 end
 
-Xer0X.fnc_eat_hld_rep_outer = fnc_eat_hld_rep_outer
+Xer0X.fnc_eat_hld_stt_rep_outer = fnc_eat_hld_stt_rep_outer
+
+local function fnc_key_state_add(state_key, key_state_id, eat_press_repeat, tick_state_repeat, fnc_state_init, fnc_state_repeat, fnc_state_final, key_run_normal_if_state_was_not_used)
+	local	dt_now = Far.UpTime
+	local	state_key_low = str_low_a(state_key)
+	local 	obj_key_state, is_new_key_state, key_rec
+	if not	key_state_id
+	then	key_state_id = win_uuid(win_uuid())
+	end
+	obj_key_state = tbl_key_states[key_state_id]
+	if not	obj_key_state
+	then	is_new_key_state = true
+		obj_key_state = {
+			key_state_id = key_state_id, 
+			is_open = dt_now,
+			keys = { },
+			obj_self = obj_hld_key,
+			fnc_state_init = fnc_state_init,
+			eat_press_repeat = eat_press_repeat,
+			tick_state_repeat = tick_state_repeat,
+			fnc_state_repeat = fnc_state_repeat,
+			fnc_state_final = fnc_state_final,
+			key_run_normal_if_state_was_not_used = key_run_normal_if_state_was_not_used,
+			cnt_inp_key_press_start = Xer0X.cnt_inp_key_press,
+			cnt_other_pressed = 0,
+		}
+		tbl_key_states[key_state_id] = obj_key_state
+	end
+	local	obj_hld_key = tbl_hld_keys[state_key_low]
+	if	obj_hld_key
+	then	obj_hld_key.cnt_state_pressed = obj_hld_key.cnt_state_pressed + 1
+		obj_hld_key.dt_pressed = dt_now
+		if not	obj_hld_key.states[key_state_id]
+		then	obj_hld_key.states[key_state_id] = obj_key_state
+		end
+	else	
+		key_rec = Xer0X.fnc_NameToInputRecord(state_key_low) 
+		obj_hld_key = {
+			dt_state_created = dt_now,
+			dt_state_pressed = dt_now,
+			cnt_state_pressed= 1,
+			cnt_state_checked= 0,
+			cnt_inp_key_press_start = Xer0X.cnt_inp_key_press,
+			area_init	= Area.Current,
+			key_name	= state_key,
+			key_name_low	= state_key_low,
+			key_rec		= key_rec,
+			key_vcd		= key_rec.VirtualKeyCode,
+			obj_self	= obj_hld_key,
+			states		= { [key_state_id] = obj_key_state }
+		}
+		tbl_hld_keys[state_key_low] = obj_hld_key
+	end
+	if not	obj_key_state.keys[state_key_low]
+	then	obj_key_state.keys[state_key_low] = obj_hld_key
+	end
+	return key_state_id, obj_key_state, obj_hld_key
+end -- fnc_key_state_add
 
 local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 	if	flg_ext_mod_off
-	or	fnc_eat_hld_rep_outer(rec_key)
+	or	fnc_eat_hld_stt_rep_outer(rec_key)
 	then	return false
 	end
 	obj_handler.prio_cond,
 	obj_handler.macrolist
-		= fnc_macro_key_check(obj_handler.key_ext.SCP, false)
+		= fnc_mcr_key_check(obj_handler.key_ext.SCP, false)
 	if next(obj_handler.prio_cond) then return 0 end
 end -- fnc_hnd_mcr_condition
 
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
+	local	key_str_ass
+	local	key_str_bas = akey(1, 0) 
+	if	key_str_bas == ""
+	then	-- somehow got it when debugger attached and "state" keys tested
+		key_str_ass = akey(1, 1)
+		if str_low(key_str_ass) == obj_handler.key_ext.KXP.rec
+		then key_str_bas = key_str_ass
+		end
+	end
 	local obj_scr = far.SaveScreen()
-	local key_str_new, t_wait_key, is_ext_timeout, is_dbl, is_hld, is_cas_mod_rls, cas_int_new
-	local key_str_bas = akey(1, 0) 
+	local key_str_new, t_wait_key, is_ext_timeout, is_dbl, is_hld, is_stt, is_cas_mod_rls, cas_int_new
+	local key_stt_id, obj_key_stt, obj_hld_key
 	local obj_key_cur = {
 		exp = { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
 		bas = str_lower(key_str_bas),
@@ -688,15 +973,15 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		key_str_seq	= key_str_bas:gsub("-", "Minus"):gsub("+", "Plus"),
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
-		key_ext		= obj_handler.key_ext,				
-		key_rec		= fnc_NameToInputRecord(key_str_bas),		
-		key_rec_act	= fnc_NameToInputRecord(key_str_bas),		
+		key_ext		= obj_handler.key_ext,			
+		key_rec		= fnc_NameToInputRecord(key_str_bas),	
+		key_rec_act	= fnc_NameToInputRecord(key_str_bas),	
 		key_exp		= obj_key_cur.exp,
-		key_time	= Far.UpTime,					
+		key_time	= Far.UpTime,				
 	}
 	local tbl_key_lev = { obj_key_lev, run_mode = "ask-normal" } -- init
 	local t_last_key = obj_key_lev.key_time
-	tbl_key_lev_hist[#tbl_key_lev_hist + 1] = tbl_key_lev
+	tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist + 1] = tbl_key_lev
 	obj_key_lev.mcr_all, obj_key_lev.mcr_fin = fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq, false)
 	obj_key_lev.hlp_str = fnc_get_seq_hlp(obj_key_lev, tbl_key_seq)
 	obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
@@ -720,12 +1005,14 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			break
 		end
 		is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
+		-- potentially every keys can be a state key, highest priority:
+		is_stt = key_str_new ~= "" or vkc_no_repeat and win_GetKeyState(vkc_no_repeat)
 		is_hld = key_str_new == "" and fnc_is_holding(obj_key_lev.key_rec)
 		is_dbl = not is_ext_timeout
 		--[[ double key need to be double pressed in the time frame lesser than OPT_DELAY_EXT,
 		to differentiate it from subsequent presses of the same key,
 		as for example to differentiate "CtrlF9:Double" and "CtrlF9-CtrlF9" ]]
-		local tbl_chk_all, tbl_chk_ext = fnc_get_ext_chk(obj_key_lev, tbl_key_seq, { DBL = is_dbl, HLD = is_hld })
+		local tbl_chk_all, tbl_chk_ext = fnc_get_ext_chk(obj_key_lev, tbl_key_seq, { DBL = is_dbl, HLD = is_hld, STT = is_stt })
 		if	#tbl_chk_all == 0
 		then	if	#tbl_key_seq == 1
 			then	tbl_key_lev.stop_cause	= "no-ext-one"
@@ -735,12 +1022,13 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			end
 			break -- run normal, is lost sequence
 		end
+		is_stt = is_stt and tbl_chk_ext.STT
 		-- holding is considered only after exceeding OPT_DELAY_EXT time frame
 		is_hld = is_hld and tbl_chk_ext.HLD and is_ext_timeout
 		is_dbl = is_dbl and tbl_chk_ext.DBL and key_str_new ~= ""
 			and (	fnc_key_equal(key_str_new, obj_key_lev.key_str_act)
 			or	fnc_key_equal(key_str_new, obj_key_lev.key_str_bas))
-		local 	str_ext = is_hld and "HLD" or is_dbl and "DBL"
+		local 	str_ext = is_stt and "STT" or is_hld and "HLD" or is_dbl and "DBL" 
 		if	str_ext
 		then
 			key_str_bas = false
@@ -751,6 +1039,17 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			obj_key_lev.key_ext		= obj_key_lev.key_ext[str_ext]
 			obj_key_cur.ext			= str_ext 
 			obj_key_cur.key			= str_lower(obj_key_cur.key..tbl_ext_mode_disp[str_ext])
+			if is_stt
+			then key_stt_id, obj_key_stt, obj_hld_key = fnc_key_state_add(
+				key_str_new ~= "" and key_str_new or obj_key_lev.key_str_act, 
+				key_stt_id, 
+				true,	-- suppress repeated
+				20,	-- tick's ms time, check released
+				nil,	-- fnc_state_init,	not needed
+				nil,	-- fnc_state_repeat,	not needed
+				nil	-- fnc_state_final,	not needed
+					)
+			end
 		elseif
 			key_str_new ~= "" -- got the next key
 		then
@@ -836,7 +1135,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				key = obj_key_lev.key_str_bas,
 			}
 			tbl_key_seq[#tbl_key_seq + 1] = obj_key_cur
-		else -- no SEQ/HLD/DBL
+		else -- no SEQ/HLD/DBL/STT
 			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
 			then	far_Message(obj_key_lev.hlp_str, obj_key_lev.key_str_seq.."-... ?", "", "l")
 			end
@@ -929,12 +1228,30 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		tbl_key_lev.run_mode == "ext-seq-run"
 	then
 		obj_status:set(str_format("%s Run ?", obj_key_lev.key_str_seq), nil, 1000000)
-		tbl_key_lev.eval_ok, tbl_key_lev.eval_res = runMacro(obj_key_lev.key_str_seq)
+		-- just take the first macro object:
+		local scr_num, scr_obj = next(obj_key_lev.mcr_fin)
+		if	obj_key_stt
+		and	obj_key_stt.is_open
+		then	obj_key_stt.fnc_state_init	= scr_obj.obj_macro.data.act_state_init
+			obj_key_stt.fnc_state_repeat	= scr_obj.obj_macro.data.act_state_repeat
+			obj_key_stt.fnc_state_final	= scr_obj.obj_macro.data.act_state_final
+			obj_key_stt.eat_press_repeat	= scr_obj.obj_macro.data.eat_press_repeat
+			obj_key_stt.tick_state_repeat	= scr_obj.obj_macro.data.tick_state_repeat
+			obj_key_stt.key_run_normal_if_state_was_not_used
+							= scr_obj.obj_macro.data.key_run_normal_if_state_was_not_used
+			obj_key_stt.obj_script		= scr_obj -- needed?
+			if	scr_obj.obj_macro.data.key_states
+			then	scr_obj.obj_macro.data.key_states[key_stt_id] = obj_key_stt
+			else	scr_obj.obj_macro.data.key_states = { [key_stt_id] = obj_key_stt }
+			end
+		end
+		tbl_key_lev.exec_time = Far.UpTime
+		tbl_key_lev.eval_ok, 
+		tbl_key_lev.eval_res 
+			= runMacro(obj_key_lev.key_str_seq)
 		if not	tbl_key_lev.eval_ok
 		and	tbl_key_lev.eval_res == -2
-		then -- just take the first macro object:
-			local scr_num, scr_obj = next(obj_key_lev.mcr_fin)
-			tbl_key_lev.eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
+		then 	tbl_key_lev.eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
 			tbl_key_lev.eval_ok = tbl_key_lev.eval_res ~= EVAL_MACRONOTFOUND
 		end
 		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq, tbl_key_lev.eval_res, EVAL_RES[tbl_key_lev.eval_res]), nil, 3000)
@@ -948,11 +1265,11 @@ end -- fnc_hnd_mcr_action
 
 -- register hotkey's handler, here keys and areas should be already normalized to lower case
 local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
-	if not	tbl_handlers[key_area]
-	then	tbl_handlers[key_area] = { }
+	if not	tbl_macro_ex_handlers[key_area]
+	then	tbl_macro_ex_handlers[key_area] = { }
 	end
 	local	m_key = obj_key_ext.KXP.str
-	local	obj_handler = tbl_handlers[key_area][m_key]
+	local	obj_handler = tbl_macro_ex_handlers[key_area][m_key]
 	if not	obj_handler
 	then	obj_handler = {
 			description	= ("MacroEx handler for %s %q"):format(str_upper(key_area), fnc_key_prettify(m_key)),
@@ -965,11 +1282,11 @@ local function fnc_key_handler_set(key_area, obj_key_ext, obj_mcr)
 				return fnc_hnd_mcr_action(obj_handler, mcr_src)
 			end
 		}
-		tbl_handlers[key_area][m_key] = obj_handler
+		tbl_macro_ex_handlers[key_area][m_key] = obj_handler
 	end
 	fnc_tbl_copy_to(obj_key_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
 	if	key_area == "common"
-	then	for ii_area_name, ii_area_handlers in pairs(tbl_handlers)
+	then	for ii_area_name, ii_area_handlers in pairs(tbl_macro_ex_handlers)
 		do 	if	ii_area_name ~= "common"
 			and	ii_area_handlers[m_key]
 			then	fnc_tbl_copy_to(ii_area_handlers[m_key].key_ext, obj_handler.key_ext, fnc_copy_key_ext_tbl, fnc_copy_key_ext_val)
@@ -983,20 +1300,31 @@ end -- fnc_key_handler_set
 local function fnc_macro_ex_create(tbl_handlers)
 	for ii_area,	ii_area_handlers	in pairs(tbl_handlers)		do
 	for ii_area_key,ii_area_key_handler	in pairs(ii_area_handlers)	do
+		local	exH_priority = 1
+		local	tbl_conflict_areas = ii_area == "common" and utils_Areas or { [ii_area] = utils_Areas[ii_area] }
+		for area_conflict_name, area_conflict_keys in pairs(tbl_conflict_areas)
+		do	local	mcr_key_coll = area_conflict_keys[ii_area_key]
+			if	mcr_key_coll and #mcr_key_coll > 0
+			then 	for mcr_idx, mcr_obj in pairs(mcr_key_coll)
+				do	if	mcr_obj.priority
+					and	mcr_obj.priority <= exH_priority
+					then	exH_priority = mcr_obj.priority - 1
+					end
+				end
+			end
+		end
 		Macro { area		= ii_area,
-			key		= fnc_key_prettify(ii_area_key),
-			description	= ii_area_key_handler.description,
-			priority	= ii_area_key_handler.priority,
-			action		= ii_area_key_handler.fnc_action,
-			condition	= ii_area_key_handler.fnc_condition,
-			priority	= 0, -- extended keys must NOT override plain keys
-			sortpriority	= 0, -- extended keys must NOT override plain keys
+			key		= fnc_key_prettify(ii_area_key)..(exH_priority < 0 and "__CONFLICT" or ""),
 			ext_key_hnd	= ii_area_key_handler,
+			description	= ii_area_key_handler.description,
+			condition	= ii_area_key_handler.fnc_condition,
+			action		= ii_area_key_handler.fnc_action,
+			priority	= exH_priority,	-- extended keys must NOT override plain keys
+			sortpriority	= 1,		-- extended keys must NOT override plain keys
 			FileName	= own_fpath,
 		}
 	end end
 end -- fnc_macro_ex_create
-
 
 local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	local tbl_handlers_loc = { }
@@ -1043,7 +1371,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			local tbl_ext_stub_jj
 			local	jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
 			if	jj_ext_mode
-			then	-- here ext_mode supposed to be HLD or DBL
+			then	-- here ext_mode supposed to be HLD, DBL, STT
 				local	jj_ext_code = tbl_ext_mode_code[jj_ext_mode]
 				if	jj_ext_code
 				then	jj_key_seq.ext = jj_ext_code
@@ -1066,6 +1394,10 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			tbl_ext_jj = jj_key_seq.ext and ALLOW_SEQ_IN_EXT and tbl_ext_stub_jj.SEQ or tbl_seq_stub_jj
 		end -- end of the sequence keys processing loop
+		if not	tbl_ext_seq_key_reg[ii_key]
+		then	tbl_ext_seq_key_reg[ii_key] = { key_path = tbl_key_ii, scripts = { [mcr_id_ext] = obj_mcr } }
+		else	tbl_ext_seq_key_reg[ii_key].scripts[mcr_id_ext] = obj_mcr
+		end
 		if	obj_mcr.data.id_ext ~= mcr_id_ext
 		then	
 			obj_mcr.data.id_ext = mcr_id_ext
@@ -1080,7 +1412,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 		obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- should be only once
 		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii)
 		do	local areas_work =
-				tbl_handlers.common and tbl_handlers.common[mm_ext_key] and { "common" }
+				tbl_macro_ex_handlers.common and tbl_macro_ex_handlers.common[mm_ext_key] and { "common" }
 				or obj_mcr.data.areas_work
 			for ll, ll_area in pairs(areas_work)
 			do	if not	tbl_handlers_loc[ll_area]
@@ -1097,6 +1429,22 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	return tbl_handlers_loc
 end -- fnc_macro_ex_check_one
 
+local function fnc_make_wrap(fnc_orig, str_mark, str_dscr, str_file)
+	return function(...)
+		local p1, p2, p3 = ...
+		local p1_type = type(p1)
+		local p2_type = type(p2)
+		local inp_val =
+			p1_type ~= "nil" and p1_type ~= "table" and p1 or
+			p2_type ~= "nil" and p2_type ~= "table" and p2 or
+			p1_type ~= "nil" and p1_type or
+			p2_type ~= "nil" and p2_type or
+			p1_type
+		local ret_val = fnc_orig(...)
+		return ret_val
+	end
+end
+
 local function fnc_macro_ex_build_all()
 	local t1 = Far.UpTime
 	for ii = 1, #LoadedMacros 
@@ -1106,16 +1454,48 @@ local function fnc_macro_ex_build_all()
 		and	str_find(ii_mcr.key, "%S[:%-%+]%S") -- %S(s) - any (non-)whitespace character
 		then	fnc_macro_ex_check_one(ii_mcr)
 		end
+		if	Xer0X.MCR_DBG_WRAP
+		and	ii_mcr.FileName ~= FileName
+		and not(ii_mcr.data and ii_mcr.data or ii_mcr).DBG_WRAP
+		then
+			local	mcr_file = ii_mcr.FileName and Xer0X.fnc_str_extract_file_name(ii_mcr.FileName) or "<UNKNOWN>"
+			local	mcr_dscr = ii_mcr.description or "<NO-DESCR>"
+			local	mcr_cond = ii_mcr.condition
+			local	mcr_acts = ii_mcr.action
+			if type(mcr_cond) == "function"
+			then ii_mcr.condition	= fnc_make_wrap(mcr_cond, "COND.", mcr_dscr, mcr_file)
+			end
+			if type(mcr_acts) == "function"
+			then ii_mcr.action	= fnc_make_wrap(mcr_acts, "ACTS.", mcr_dscr, mcr_file)
+			end
+			(ii_mcr.data and ii_mcr.data or ii_mcr).DBG_WRAP = true
+		end
 	end
-	fnc_macro_ex_create(tbl_handlers)
+	fnc_macro_ex_create(tbl_macro_ex_handlers)
 	if opts.DbgShowLoadTime
-	then far_Message(Far.UpTime - t1, "extended keys load time")
+	then 	le(opts)
+		far_Message(Far.UpTime - t1, "extended keys load time")
 	end
 	if not	Xer0X.fnc_macro_ex_build_all
 	then	Xer0X.fnc_macro_ex_build_all = fnc_macro_ex_build_all
 	end
-	return tbl_handlers
+	return tbl_macro_ex_handlers
 end -- fnc_macro_ex_build_all
+
+Macro {	description = "Save all keys for the further analysis",
+	area = "Common", key = "/.+/", 
+	condition = function(inp_key)
+		if Area.Menu and Menu.Id == "7646F761-8954-42CA-9CFC-E3F98A1C54D3"
+		or not inp_key
+		then return -- not in LuaExplorer
+		end
+		tbl_key_mcr_journal[#tbl_key_mcr_journal + 1] = { inp_key = inp_key, area = Area.Current, key_rec = fnc_NameToInputRecord(inp_key), key_time = Far.UpTime }
+		if #tbl_key_mcr_journal > 1000
+		then tbl_remove(tbl_key_mcr_journal, 1)
+		end
+	end,
+	action = function() end
+}
 
 Event { group = "ExitFAR",
 	description = "Save MacroEx data and statistics on FAR exit",
@@ -1127,7 +1507,7 @@ then
 else
 --[=[ need to be the last call,
 so that all other macros loaded already: ]=]
-mf.postmacro(fnc_macro_ex_build_all)
+mf_postmacro(fnc_macro_ex_build_all)
 end
 
 -- @@@@@
