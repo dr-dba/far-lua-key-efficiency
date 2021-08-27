@@ -28,7 +28,7 @@ local nfo = Info({
 	description	= "Launching macros in unconventional ways (+@Xer0X mod)",
 	id		= "35FD5420-D2A1-4A1C-AAFD-4C902231F549",
 	version		= "3.2",
-	version_mod	= "3.1.0",
+	version_mod	= "3.1.0.1",
 	author		= "JD",
 	author_mod	= "x-Team",
 	url		= "https://forum.farmanager.com/viewtopic.php?f=15&t=8764",
@@ -293,7 +293,7 @@ local function fnc_key_state_run_remove(key_state, dt_now)
 	do	ii_key_obj.states[key_state_id] = nil
 		if	keys_run_normal 
 		then
-			tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist].reset_hold = ii_key_name
+			tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist].reset_hld_stt = ii_key_name
 			mf_postmacro(Keys, ii_key_obj.key_name)
 		end
 	end
@@ -366,7 +366,7 @@ Event {	description = "MacroEx helper",
 			local	last_hist_key = last_hist and last_hist[#last_hist]
 			if	vkc
 			and	last_hist_key
-			and not last_hist.reset_hold
+			and not last_hist.reset_hld_stt
 			and (	last_hist_key.ext_type == "HLD"
 			or	last_hist_key.ext_type == "STT")
 			and	last_hist.run_mode == "ext-seq-run"
@@ -375,7 +375,7 @@ Event {	description = "MacroEx helper",
 				else	key_inp_rec.KeyTime = Far.UpTime 
 					key_inp_rec.KeyExitDeltaTime = last_hist.exit_time and key_inp_rec.KeyTime - last_hist.exit_time
 					key_inp_rec.KeyExecDeltaTime = last_hist.exec_time and key_inp_rec.KeyTime - last_hist.exec_time
-					last_hist.reset_hold = key_inp_rec
+					last_hist.reset_hld_stt = key_inp_rec
 				end
 			end
 			if	vkc_no_repeat
@@ -868,7 +868,7 @@ local function fnc_eat_hld_stt_rep_outer(rec_key)
 	local	last_hist = tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist]
 	local	last_hist_key = last_hist and last_hist[#last_hist]
 	if	last_hist_key
-	and not last_hist.reset_hold
+	and not last_hist.reset_hld_stt
 	and	last_hist.run_mode == "ext-seq-run"
 	and (	last_hist_key.ext_type == "HLD"
 	or	last_hist_key.ext_type == "STT" )
