@@ -1,7 +1,10 @@
 --[[
-if true then return end --]]
+do return end --]]
 
 --[[
+GitHub file:
+https://github.com/dr-dba/far-lua-key-efficiency/edit/main/MacroEx.@Xer0X.Lua
+
 DEPENDS ON MODULES:
 
 https://github.com/dr-dba/far-lua-internals
@@ -37,32 +40,37 @@ local nfo = Info({
 	-- LuaMacro 501 (ConsoleInput)
 	minfarversion	= { 3, 0, 0, 4430, 0 },
 	options		= {
-		break_seq_on_mod_release
+		BreakSeqOnModRelease
 				= false,
-		allow_seq_with_any_mod
+		AllowSeqWithAnyMod
 				= true,
-		allow_seq_in_ext= true,
+		AllowSeqInExt	= true,
 		DelayExt	=  400, -- 500 is ok
 		DelaySeq	= 2000,
-		DelayHlp	= 2000,
-		ext_modes 	= {
+		DelayHlp	= 3000,
+		LimitHld	=  400,
+		LimitDbl	=  600,
+		ExtModes	= {
 			HLD = true, -- holding
 			DBL = true, -- double
 			STT = true, -- state
+			MNY = true, -- many of the key expr
 		},
 		DbgShowBadExt	= false,
 		DbgShowBadKey	= false,
-		DbgShowLoadTime	= false,
+		DbgShowLoadTime	= true,
 	}
 })
 if not nfo then return end
 local opts = nfo.options
-local BREAK_SEQ_ON_MOD_RELEASE	= opts.break_seq_on_mod_release
-local ALLOW_SEQ_WITH_ANY_MOD	= opts.allow_seq_with_any_mod
-local ALLOW_SEQ_IN_EXT		= opts.allow_seq_in_ext
+local BREAK_SEQ_ON_MOD_RELEASE	= opts.BreakSeqOnModRelease
+local ALLOW_SEQ_WITH_ANY_MOD	= opts.AllowSeqWithAnyMod
+local ALLOW_SEQ_IN_EXT		= opts.AllowSeqInExt
 local OPT_DELAY_SEQ		= opts.DelaySeq
 local OPT_DELAY_HLP		= opts.DelayHlp
 local OPT_DELAY_EXT		= opts.DelayExt
+local OPT_LIMIT_HLD		= opts.LimitHld
+local OPT_LIMIT_DBL		= opts.LimitDbl
 
 -- @@@ END OF THE INFO AND OPTIONS BLOCK @@@
 
@@ -107,12 +115,14 @@ local math_min	= math.min
 local math_max	= math.max
 local tbl_concat= table.concat
 local tbl_insert= table.insert
+local tbl_ins	= table.insert
 local tbl_remove= table.remove
 local tbl_sort	= table.sort
 local tostr	= tostring
 local tostring	= tostring
 local io_open	= io.open
 local bit64_band= bit64.band
+local dbg_getinf= debug.getinfo
 
 local far_Message		= far.Message
 local far_ProcessName		= far.ProcessName
@@ -136,12 +146,15 @@ local MCODE_F_CHECKALL		= 0x80C64
 local MCODE_F_GETOPTIONS	= 0x80C65 
 local MCODE_F_MACROSETTINGS	= 0x80C6A
 
-local EVAL_SUCCESS       =  0
-local EVAL_SYNTAXERROR   = 11
-local EVAL_BADARGS       = -1
-local EVAL_MACRONOTFOUND = -2
-local EVAL_MACROCANCELED = -3
-local EVAL_RUNTIMEERROR  = -4
+local EVAL_SHIFT_X		= 1000
+local EVAL_SUCCESS		=  0
+local EVAL_SUCCESS_X		=  0 + EVAL_SHIFT_X
+local EVAL_SYNTAXERROR		= 11
+local EVAL_BADARGS		= -1
+local EVAL_MACRONOTFOUND	= -2
+local EVAL_MACRONOTFOUND_X	= -2 - EVAL_SHIFT_X
+local EVAL_MACROCANCELED	= -3
+local EVAL_RUNTIMEERROR		= -4
 local EVAL_RES = {
 	 [EVAL_SUCCESS]		= "EVAL_SUCCESS"	--  0
 	,[EVAL_SYNTAXERROR]	= "EVAL_SYNTAXERROR"	-- 11
@@ -149,6 +162,8 @@ local EVAL_RES = {
 	,[EVAL_MACRONOTFOUND]	= "EVAL_MACRONOTFOUND"	-- -2 макрос не найден среди загруженных макросов
 	,[EVAL_MACROCANCELED]	= "EVAL_MACROCANCELED"	-- -3 было выведено меню выбора макроса, и пользователь его отменил
 	,[EVAL_RUNTIMEERROR]	= "EVAL_RUNTIMEERROR"	-- -4 макрос был прерван в результате ошибки времени исполнения
+	,[EVAL_SUCCESS_X]	= "EVAL_SUCCESS_X"
+	,[EVAL_MACRONOTFOUND_X]	= "EVAL_MACRONOTFOUND_X"
 }
 
 local LEFT_ALT_PRESSED	= F.LEFT_ALT_PRESSED
@@ -164,6 +179,7 @@ local MOD_MASK = bor(
 	RIGHT_CTRL_PRESSED,
 	SHIFT_PRESSED
 		)
+local fnc_extr_file_name= Xer0X.fnc_str_extract_file_name
 local fnc_tbl_copy	= Xer0X.fnc_tbl_copy
 local fnc_str_split	= Xer0X.fnc_str_split
 local fnc_tbl_copy_to	= Xer0X.fnc_tbl_copy_to
@@ -180,8 +196,8 @@ local utils_Areas	= Xer0X.utils.Areas
 local RLSD_KEYS_CHCK_TICK = 100
 local rlsd_keys_chck_last = Far.UpTime
 
-local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD",	state = "STT"	}
-local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold",	STT = ":State"	}
+local	tbl_ext_mode_code = { double = "DBL",	hold = "HLD",	state = "STT"	, many = "MNY"	}
+local	tbl_ext_mode_disp = { DBL = ":Double",	HLD = ":Hold",	STT = ":State"	, MNY = ":Many" }
 
 local	Xer0X	= require("Lib-Common-@Xer0X")
 local	dmp_srlz= require("dmp-tbl-alt-@Xer0X")
@@ -191,7 +207,7 @@ then	req_ok, req_msg, fnc_lua_exp= Xer0X.fnc_safe_require("LE")
 end
 local	as_mdl, inp_args, own_fpath = Xer0X.fnc_file_whoami({ ... })
 local	FileName = ... or own_fpath
-
+local	MACRO_HELP_FOOTER = "\n\1\nPress AltEscape to cancel the sequence\nPress ShiftSpace to run as normal keys"
 
 local tbl_hld_keys = { }
 Xer0X.tbl_hld_keys = tbl_hld_keys
@@ -292,8 +308,7 @@ local function fnc_key_state_run_remove(key_state, dt_now)
 	-- clean the state from all keys
 	do	ii_key_obj.states[key_state_id] = nil
 		if	keys_run_normal 
-		then
-			tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist].reset_hld_stt = ii_key_name
+		then	tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist].reset_hld_stt = ii_key_name
 			mf_postmacro(Keys, ii_key_obj.key_name)
 		end
 	end
@@ -370,7 +385,7 @@ Event {	description = "MacroEx helper",
 			and (	last_hist_key.ext_type == "HLD"
 			or	last_hist_key.ext_type == "STT")
 			and	last_hist.run_mode == "ext-seq-run"
-			then	if	last_hist_key.key_rec.VirtualKeyCode == vkc
+			then	if last_hist_key.key_rec.VirtualKeyCode == vkc
 				then	j_rec.suppress = true
 				else	key_inp_rec.KeyTime = Far.UpTime 
 					key_inp_rec.KeyExitDeltaTime = last_hist.exit_time and key_inp_rec.KeyTime - last_hist.exit_time
@@ -473,15 +488,17 @@ end
 
 
 local rgx_key_parse_v2 = regex.new("/^(l?ctrl)?(rctrl)?(l?alt)?(ralt)?(shift)?(.+)?$/i")
-local function fnc_key_parse(the_key)
-	local	obj_parsed = tbl_parsed_keys_val_cache[the_key]
+local function fnc_key_parse(the_key, case_sens)
+	if not	the_key then return end
+	local	key_cache = str_format("%s|%s", the_key, tostring(case_sens))
+	local	obj_parsed = tbl_parsed_keys_val_cache[key_cache]
 	if	obj_parsed
 	then	return obj_parsed
 	end
-	if	tbl_parsed_keys_bad_cache[the_key]
+	if	tbl_parsed_keys_bad_cache[key_cache]
 	then	return false
 	end
-	local the_key_low = string.lower(the_key)
+	local the_key_low = case_sens and the_key or str_lower(the_key)
 	local t_rec_1 = { }
 	t_rec_1.ctl_l, t_rec_1.ctl_r, t_rec_1.alt_l, t_rec_1.alt_r, t_rec_1.shift, t_rec_1.plain = rgx_key_parse_v2:match(the_key_low)
 	local t_rec_2 = { }
@@ -492,7 +509,7 @@ local function fnc_key_parse(the_key)
 	or	t_rec_2.alt_l
 	or	t_rec_2.alt_r
 	or	t_rec_2.shift
-	then	tbl_parsed_keys_bad_cache[the_key] = { t_rec_1, t_rec_2 }
+	then	tbl_parsed_keys_bad_cache[key_cache] = { t_rec_1, t_rec_2 }
 		return false
 	end
 	::after_validity_check::
@@ -500,22 +517,25 @@ local function fnc_key_parse(the_key)
 	t_rec_1.alt_x = not t_rec_1.alt_r and t_rec_1.alt_l and str_lower(t_rec_1.alt_l) == "alt"
 	t_rec_1.ctl_e = t_rec_1.ctl_r or t_rec_1.ctl_l
 	t_rec_1.alt_e = t_rec_1.alt_r or t_rec_1.alt_l
-	tbl_parsed_keys_val_cache[the_key] = t_rec_1
+	tbl_parsed_keys_val_cache[key_cache] = t_rec_1
 	return t_rec_1
 end -- fnc_key_parse
 
-local function fnc_key_expand(the_key, in_lower, as_single )
---	assert(key:match("^%l+$"))
-	if not the_key then return end
-	local key_cache = str_format("%s|%s|%s", the_key, tostring(in_lower), tostring(as_single))
-	local obj_cache = tbl_key_expanded_cache[key_cache]
-	if obj_cache then return unpack(tbl_key_expanded_cache[key_cache]) end
+local function fnc_key_expand(the_key, in_lower, as_single , obj_rgx)
+--	assert(key:match("^%l+$")) is_regex
+	if not	the_key then return end
+	local	key_cache = str_format("%s|%s|%s", the_key, tostring(in_lower), tostring(as_single))
+	local	obj_cache = tbl_key_expanded_cache[key_cache]
+	if	obj_cache then return unpack(tbl_key_expanded_cache[key_cache]) end
 	local R =	in_lower and "r"	or "R"
 	local L	=	in_lower and "l"	or "L"
 	local ALT =	in_lower and "alt"	or "Alt"
 	local CTL =	in_lower and "ctrl"	or "Ctrl"
-	local obj_key = fnc_key_parse(in_lower and str_lower(the_key) or the_key) 
+	local obj_key = obj_rgx 
+		and { regex = the_key, reobj = obj_rgx }
+		or fnc_key_parse(the_key, not in_lower)
 	local tbl_exp = { }
+	local ctl, alt
 	ctl = obj_key.ctl_x and L
 	repeat
 	alt = obj_key.alt_x and L
@@ -526,7 +546,9 @@ local function fnc_key_expand(the_key, in_lower, as_single )
 		alt_l = not alt and not not obj_key.alt_l or alt == L,
 		alt_r = not alt and not not obj_key.alt_r or alt == R,
 		shift = obj_key.shift,
-		plain = obj_key.plain
+		plain = obj_key.plain,
+		regex = obj_key.regex,
+		reobj = obj_key.reobj,
 	}
 	tbl_key.cas =	(ctl and ctl..CTL or (obj_key.ctl_l and L..CTL or "")..(obj_key.ctl_r and R..CTL or ""))..
 			(alt and alt..ALT or (obj_key.alt_l and L..ALT or "")..(obj_key.alt_r and R..ALT or ""))..
@@ -534,7 +556,7 @@ local function fnc_key_expand(the_key, in_lower, as_single )
 	tbl_key.rec_cas=(ctl and (ctl == R and R or "")..CTL or (obj_key.ctl_l and L..CTL or "")..(obj_key.ctl_r and R..CTL or ""))..
 			(alt and (alt == R and R or "")..ALT or (obj_key.alt_l and L..ALT or "")..(obj_key.alt_r and R..ALT or ""))..
 			(obj_key.shift or "")
-	tbl_key.str = tbl_key.cas	..(obj_key.plain or "")
+	tbl_key.str = tbl_key.cas	..(obj_key.plain or obj_key.regex or "")
 	tbl_key.rec = tbl_key.rec_cas	..(obj_key.plain or "")
 	tbl_exp[tbl_key.str] = tbl_key
 	alt = not as_single and alt == L and R
@@ -545,21 +567,23 @@ local function fnc_key_expand(the_key, in_lower, as_single )
 	return tbl_exp, obj_key
 end -- fnc_key_expand
 
-local function fnc_key_equal(key_base, key_comp)
+local function fnc_key_equal(key_base, key_comp, case_sens)
 	if not	key_base
 	or not	key_comp
 	or	key_base == ""
 	or	key_comp == ""
 	then	return
 	end
-	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, true, false)
-	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, true, false)
+	local tbl_base = type(key_base) == "table" and key_base or fnc_key_expand(key_base, not case_sens, false)
+	local tbl_comp = type(key_comp) == "table" and key_comp or fnc_key_expand(key_comp, not case_sens, false)
 	for ii_base, ii_base_val in pairs(tbl_base) do
 	for ii_comp, ii_comp_val in pairs(tbl_comp) do
 	if	str_lower(ii_base)
 	==	str_lower(ii_comp)
-	then return
-		str_lower(ii_comp), ii_comp_val
+	then	return ii_comp:lower(), ii_comp_val
+	elseif	ii_comp_val.reobj
+	and	ii_comp_val.reobj:match(ii_base) ~= ""
+	then	return ii_comp, ii_comp_val
 	end
 	end
 	end
@@ -589,84 +613,138 @@ local function fnc_copy_key_ext_tbl(tbl_from, tbl_from_loc, tbl_dest, tbl_dest_l
 	end
 end
 
-local function fnc_get_seq_hlp(obj_key_lev, tbl_key_seq)
-	local	tbl_hlp = { }
-	for	ii_mcr_idx, ii_mcr_item in pairs(obj_key_lev.mcr_all)
-	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
-		do	if	tbl_key_seq[#tbl_key_seq].ext == jj_key_path[#tbl_key_seq].ext
-			then	tbl_hlp[#tbl_hlp + 1] = fnc_key_prettify(jj_key_full).." - "..ii_mcr_item.obj_macro.description
-			end
-		end
-	end
-	return next(tbl_hlp) and tbl_concat(tbl_hlp, "\n").."\n\1\nPress AltEscape to cancel the sequence\nPress ShiftSpace to run as normal keys" or false
-end -- fnc_get_seq_hlp
-
-local function fnc_get_ext_chk(obj_key_lev, tbl_key_seq, wait_ext)
-	local tbl_chk = { }
+local function fnc_get_ext_chk(obj_key_lev, key_str_new, t_wait_key)
+	local tbl_ext_allowed = {
+		-- holding is considered only after exceeding OPT_DELAY_EXT time frame
+		["HLD"] = not obj_key_lev.ext_type and key_str_new == "" and fnc_is_holding(obj_key_lev.key_rec) and ((t_wait_key - obj_key_lev.key_time) > OPT_LIMIT_HLD and 2 or 1) or 0,
+		["DBL"] = not obj_key_lev.ext_type and (t_wait_key - obj_key_lev.key_time) < OPT_LIMIT_DBL and (key_str_new ~= "" and (fnc_key_equal(key_str_new, obj_key_lev.key_str_bas) and 2 or 0) or 1) or 0,
+		["STT"] = not obj_key_lev.ext_type and key_str_new == "" and vkc_no_repeat and win_GetKeyState(vkc_no_repeat) and 2 or 0,
+		["MNY"] = (obj_key_lev.ext_type or "MNY") == "MNY" and (key_str_new ~= "" and 2 or 1) or 0,
+		["NON"] = key_str_new == "" and 2 or 0,
+		["SEQ"] = key_str_new ~= "" and 2 or 1,
+	}
 	local tbl_ext = { }
-	for	ii_mcr_idx, ii_mcr_item in pairs(obj_key_lev.mcr_all)
-	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
-		do	local	jj_ext = jj_key_path[#tbl_key_seq].ext
-			if not	jj_ext
-			or (	wait_ext[jj_ext] -- allowed extensions
-			and not	obj_key_lev.ext_type) -- already has extension
-			then	tbl_chk[#tbl_chk + 1] = ii_mcr_item
-				if	jj_ext
-				then	if not	tbl_ext[jj_ext]
-					then	tbl_ext[jj_ext] = { ii_mcr_item }
-					else	tbl_ext[jj_ext][#tbl_ext[jj_ext] + 1] = ii_mcr_item
-					end
-				end
-			elseif	jj_ext == tbl_key_seq[#tbl_key_seq].ext
-			and	#tbl_key_seq < #jj_key_path
-			then	tbl_chk[#tbl_chk + 1] = ii_mcr_item
+	local cur_ext_type = obj_key_lev.ext_type or "NON"
+	for ii_mcr_key_cur_full, ii_mcr_key_cur_coll in pairs(obj_key_lev.mcr_key_cur)
+	do	for ii_mcr_key_cur_idx, ii_mcr_key_cur_obj in ipairs(ii_mcr_key_cur_coll)
+		do
+			local	ii_mcr_key_cur_ext = ii_mcr_key_cur_obj.key_path_cur.ext or "NON"
+			if	ii_mcr_key_cur_ext == cur_ext_type
+			and	ii_mcr_key_cur_ext ~= "MNY"
+			and	ii_mcr_key_cur_obj.key_path_len >
+				ii_mcr_key_cur_obj.key_path_pos
+			then	ii_mcr_key_cur_ext = "SEQ"
 			end
+			if	tbl_ext_allowed[ii_mcr_key_cur_ext] == 0
+			then	goto loop_end
+			elseif	tbl_ext_allowed[ii_mcr_key_cur_ext] == 1
+			then	ii_mcr_key_cur_ext = "PRE"
+			elseif	tbl_ext_allowed[ii_mcr_key_cur_ext] == 2
+			then	-- is eligible
+			else	-- just can not be
+			end
+			::again_for_seq_after_many::
+			if not	tbl_ext[ii_mcr_key_cur_ext]
+			then	tbl_ext[ii_mcr_key_cur_ext] = { count = 1 }
+			else	tbl_ext[ii_mcr_key_cur_ext].count = 
+				tbl_ext[ii_mcr_key_cur_ext].count + 1
+			end
+			if not	tbl_ext[ii_mcr_key_cur_ext][ii_mcr_key_cur_obj.key_full]
+			then	tbl_ext[ii_mcr_key_cur_ext][ii_mcr_key_cur_obj.key_full] = { count = 1 }
+			else	tbl_ext[ii_mcr_key_cur_ext][ii_mcr_key_cur_obj.key_full].count = 
+				tbl_ext[ii_mcr_key_cur_ext][ii_mcr_key_cur_obj.key_full].count + 1
+			end
+			tbl_ins(tbl_ext[ii_mcr_key_cur_ext][ii_mcr_key_cur_obj.key_full], ii_mcr_key_cur_obj)
+			if	ii_mcr_key_cur_ext == "MNY"
+			and	ii_mcr_key_cur_obj.key_path_len >
+				ii_mcr_key_cur_obj.key_path_pos
+			then	ii_mcr_key_cur_ext = "SEQ"
+				goto again_for_seq_after_many
+			end
+			::loop_end::
 		end
 	end
-	return tbl_chk, tbl_ext
+	local str_ext = tbl_ext.STT and "STT" -- potentially every keys can be a state key, highest priority
+		or	tbl_ext.HLD and "HLD"
+		or	tbl_ext.DBL and "DBL"
+		or	tbl_ext.MNY and "MNY"
+		or	tbl_ext.SEQ and "SEQ"
+	return	str_ext, tbl_ext, tbl_ext_allowed
 end -- fnc_get_ext_chk
 
-local function fnc_get_fin_scp(key_scr, prio_cond, tbl_key_seq, final_only)
+local function fnc_get_fin_scp(key_scr, prio_cond, tbl_key_lev, final_only)
 	local	tbl_mcr_coll = fnc_macro_collect(key_scr or { })
+	local	tbl_mcr_help = { }
 	local	tbl_res_equal = { }
 	local	tbl_res_final = { }
-	for	ii_mcr_id, ii_mcr_item in pairs(tbl_mcr_coll)
-	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
+	local	tbl_mcr_key_cur = { }
+	for ii_mcr_id, ii_mcr_item in pairs(tbl_mcr_coll)
+	do	for jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
 		do	if	prio_cond[ii_mcr_id]
 			and	prio_cond[ii_mcr_id][jj_key_full]
 			then    if not	final_only
-				or	#jj_key_path == #tbl_key_seq
-				then	local is_equal, is_final
-					for ii_seq_pos, ii_seq_key in pairs(tbl_key_seq)
-					do	is_equal = fnc_key_equal(ii_seq_key.exp, jj_key_path[ii_seq_pos].exp)
-						if not	is_equal
-						then	break
-						end
-						is_equal = ii_seq_key.ext == jj_key_path[ii_seq_pos].ext
-						if not	is_equal
-						then	if	final_only
-							or	ii_seq_pos < #tbl_key_seq
-							then	break
-							else	is_equal = true -- last extension can be unequal
+				then	local is_equal, is_final, in_many
+					local jj_key_pos = 1
+					for kk_seq_pos, kk_seq_key in ipairs(tbl_key_lev)
+					do	::loop_code_start::
+						is_many = jj_key_path[jj_key_pos].ext == "MNY" and (kk_seq_key.ext_type or "MNY") == "MNY"
+						is_equal = fnc_key_equal(
+							is_many and kk_seq_key.key_str_bas or kk_seq_key.key_exp,
+							jj_key_path[jj_key_pos].exp,
+							is_many -- lets suppose MNY is always regexp-based and thus case-sensitive
+								) and (
+							is_many -- multiple expected, allow it
+							or	kk_seq_pos == #tbl_key_lev  -- the last key in the sequence, 
+							and not kk_seq_key.ext_type -- .. and still no extension determined in the last.
+							or	kk_seq_key.ext_type == jj_key_path[jj_key_pos].ext -- good obviously
+								)
+						if	is_equal
+						then	if	jj_key_pos == #jj_key_path
+							and	kk_seq_pos == #tbl_key_lev
+							then	is_final = kk_seq_key.ext_type == jj_key_path[jj_key_pos].ext
+							elseif	kk_seq_pos < #tbl_key_lev
+							and not	is_many
+							then	jj_key_pos = jj_key_pos + 1
 							end
-						else	if	ii_seq_pos == #tbl_key_seq
-							and	ii_seq_pos == #jj_key_path
-							then	is_final = true
-								ii_mcr_item.is_final = true
+						else	-- is not equal, exit keys path
+							if not	is_many
+							or	jj_key_pos == #jj_key_path
+							then	break
+							elseif	is_many 
+							then	jj_key_pos = jj_key_pos + 1
+								goto loop_code_start
 							end
 						end
 					end
 					if	is_equal
 					then	tbl_res_equal[#tbl_res_equal + 1] = ii_mcr_item
+						if not	is_final
+						or	jj_key_path[jj_key_pos].ext == "MNY"
+						then	tbl_mcr_help[#tbl_mcr_help + 1] = fnc_key_prettify(jj_key_full).." - "..ii_mcr_item.obj_macro.description
+						end
+						if not	tbl_mcr_key_cur[jj_key_full]
+						then	tbl_mcr_key_cur[jj_key_full] = { count = 1 }
+						else	tbl_mcr_key_cur[jj_key_full].count = tbl_mcr_key_cur[jj_key_full].count + 1
+						end
+						tbl_ins(tbl_mcr_key_cur[jj_key_full], {
+							is_final	= is_final,
+							key_path_pos	= jj_key_pos,
+							key_path_cur	= jj_key_path[jj_key_pos],
+							key_path_len	=#jj_key_path,
+							key_full	= jj_key_full,
+							mcr_item	= ii_mcr_item,
+							mcr_extid	= ii_mcr_item.mcr_extid,
+						})
 					end
-					if	is_final
+					if	is_final -- the logic means that it is also equal automatically
 					then	tbl_res_final[#tbl_res_final + 1] = ii_mcr_item
 					end
 				end
 			end
 		end
 	end
-	return tbl_res_equal, tbl_res_final
+	local	hlp_str = next(tbl_mcr_help) and tbl_concat(tbl_mcr_help, "\n")..MACRO_HELP_FOOTER or false
+	return	tbl_res_equal, tbl_res_final, tbl_mcr_key_cur, hlp_str
 end -- fnc_get_fin_scp
 
 local function GetMacro(argKey, argUseCommon)
@@ -766,11 +844,11 @@ local function GetMacro(argKey, argUseCommon)
 end -- GetMacro
 
 local function fnc_mcr_key_check(key_scr)
-	local	tbl_mcr_coll = fnc_macro_collect(key_scr)
-	local	tbl_mcr_key_ok = { }
-	local	macrolist = { }
-	for	ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
-	do	for	jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
+	local tbl_mcr_coll = fnc_macro_collect(key_scr)
+	local tbl_mcr_key_ok = { }
+	local macrolist = { }
+	for ii_mcr_idx, ii_mcr_item in pairs(tbl_mcr_coll)
+	do	for jj_key_full, jj_key_path in pairs(ii_mcr_item.keys_full)
 		do	
 			local jj_mcr_list, mcr_hi_idx = GetMacro(jj_key_full, true)
 			for jj_mcr_idx, jj_mcr_obj in pairs(jj_mcr_list)
@@ -851,11 +929,6 @@ end -- fnc_cas_int_to_str
 
 Xer0X.fnc_cas_int_to_str = fnc_cas_int_to_str
 
-local function runMacro(key, ext)
-	local	eval_res = eval(key..(ext and ext or ""), 2)
-	return	eval_res ~= EVAL_MACRONOTFOUND, eval_res
-end
-
 local function runMacroOrKey(the_key)
 	local	eval_res = eval(the_key, 2)
 	if	eval_res == EVAL_MACRONOTFOUND
@@ -881,15 +954,14 @@ Xer0X.fnc_eat_hld_stt_rep_outer = fnc_eat_hld_stt_rep_outer
 
 local function fnc_key_state_add(state_key, key_state_id, eat_press_repeat, tick_state_repeat, fnc_state_init, fnc_state_repeat, fnc_state_final, key_run_normal_if_state_was_not_used)
 	local	dt_now = Far.UpTime
-	local	state_key_low = str_low_a(state_key)
-	local 	obj_key_state, is_new_key_state, key_rec
+	local	state_key_low = state_key:lower()
 	if not	key_state_id
 	then	key_state_id = win_uuid(win_uuid())
 	end
-	obj_key_state = tbl_key_states[key_state_id]
+	local	obj_hld_key =	tbl_hld_keys[state_key_low]
+	local	obj_key_state = tbl_key_states[key_state_id]
 	if not	obj_key_state
-	then	is_new_key_state = true
-		obj_key_state = {
+	then	obj_key_state = {
 			key_state_id = key_state_id, 
 			is_open = dt_now,
 			keys = { },
@@ -905,15 +977,20 @@ local function fnc_key_state_add(state_key, key_state_id, eat_press_repeat, tick
 		}
 		tbl_key_states[key_state_id] = obj_key_state
 	end
-	local	obj_hld_key = tbl_hld_keys[state_key_low]
 	if	obj_hld_key
-	then	obj_hld_key.cnt_state_pressed = obj_hld_key.cnt_state_pressed + 1
+	then	
+		obj_hld_key.cnt_state_pressed = obj_hld_key.cnt_state_pressed + 1
 		obj_hld_key.dt_pressed = dt_now
+		for ii_key in pairs(obj_hld_key.states)
+		do	if ii_key ~= key_state_id
+			then obj_hld_key.states[ii_key] = nil
+			end
+		end
 		if not	obj_hld_key.states[key_state_id]
 		then	obj_hld_key.states[key_state_id] = obj_key_state
 		end
 	else	
-		key_rec = Xer0X.fnc_NameToInputRecord(state_key_low) 
+		local key_rec = fnc_NameToInputRecord(state_key_low) 
 		obj_hld_key = {
 			dt_state_created = dt_now,
 			dt_state_pressed = dt_now,
@@ -947,50 +1024,58 @@ local function fnc_hnd_mcr_condition(obj_handler, rec_key, mcr_src)
 	if next(obj_handler.prio_cond) then return 0 end
 end -- fnc_hnd_mcr_condition
 
+local MULTI_KEY_EXT = {
+	["MNY"] = true,
+	["SEQ"] = true,
+}
+
 local function fnc_hnd_mcr_action(obj_handler, mcr_src)
-	local	key_str_ass
 	local	key_str_bas = akey(1, 0) 
 	if	key_str_bas == ""
-	then	-- somehow got it when debugger attached and "state" keys tested
-		key_str_ass = akey(1, 1)
-		if str_low(key_str_ass) == obj_handler.key_ext.KXP.rec
-		then key_str_bas = key_str_ass
+	then -- somehow got it when debugger attached and "state" keys tested
+		local	key_str_ass = akey(1, 1)
+		if	key_str_ass:lower() == obj_handler.key_ext.KXP.rec
+		then	key_str_bas = key_str_ass
 		end
 	end
 	local obj_scr = far.SaveScreen()
-	local key_str_new, t_wait_key, is_ext_timeout, is_dbl, is_hld, is_stt, is_cas_mod_rls, cas_int_new
 	local key_stt_id, obj_key_stt, obj_hld_key
-	local obj_key_cur = {
-		exp = { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
-		bas = str_lower(key_str_bas),
-		key = str_lower(key_str_bas),
-	}
-	local tbl_key_seq = { obj_key_cur } -- init
+	local key_str_seq_new_pretty = key_str_bas:gsub("-", "Minus"):gsub("+", "Plus")
+	local is_rgx = obj_handler.key_ext.KXP.reobj
 	local obj_key_lev = {
 		key_str_act	= key_str_bas,				
 		key_str_bas	= key_str_bas,				
 		key_str_bas_ext = key_str_bas,				
-		key_str_seq	= key_str_bas:gsub("-", "Minus"):gsub("+", "Plus"),
+		key_str_seq	= key_str_seq_new_pretty,
+		key_str_seq_rgx	= is_rgx and obj_handler.key_ext.KXP.str or key_str_seq_new_pretty,
+		key_reg_exp_obj	= is_rgx and obj_handler.key_ext.KXP.reobj or nil,
+		key_reg_exp_str	= is_rgx and obj_handler.key_ext.KXP.regex or nil,
+		key_reg_exp_cnt	= is_rgx and 1 or nil,
 		key_str_cas	= obj_handler.key_ext.KXP.cas,
 		key_str_cas_rec = obj_handler.key_ext.KXP.rec_cas,
 		key_ext		= obj_handler.key_ext,			
 		key_rec		= fnc_NameToInputRecord(key_str_bas),	
 		key_rec_act	= fnc_NameToInputRecord(key_str_bas),	
-		key_exp		= obj_key_cur.exp,
+		key_exp		= { [obj_handler.key_ext.KXP.str] = obj_handler.key_ext.KXP },
 		key_time	= Far.UpTime,				
 	}
 	local tbl_key_lev = { obj_key_lev, run_mode = "ask-normal" } -- init
-	local t_last_key = obj_key_lev.key_time
 	tbl_ext_key_lev_hist[#tbl_ext_key_lev_hist + 1] = tbl_key_lev
-	obj_key_lev.mcr_all, obj_key_lev.mcr_fin = fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq, false)
-	obj_key_lev.hlp_str = fnc_get_seq_hlp(obj_key_lev, tbl_key_seq)
+	obj_key_lev.mcr_all, 
+	obj_key_lev.mcr_fin, 
+	obj_key_lev.mcr_key_cur,
+	obj_key_lev.hlp_str 
+		= fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_lev, false)
 	obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
 	obj_waitkeys:init(obj_key_lev.key_str_bas)
 	vkc_no_repeat = obj_key_lev.key_rec.VirtualKeyCode -- global var, prevent autorepeat
 	repeat
-		key_str_new, t_wait_key = obj_waitkeys:save(50)
+		local key_str_new, t_wait_key = obj_waitkeys:save(50)
+		if key_str_new ~= ""
+		then
+		end
 		if (	key_str_new ==  "AltEsc"
-		or	key_str_new == "RAltEsc")
+		or	key_str_new == "RAltEsc" )
 		and	key_str_new ~= key_str_bas
 		then	tbl_key_lev.stop_cause	= "user-cancel"
 			tbl_key_lev.run_mode	= "run-cancel"
@@ -1004,42 +1089,33 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			tbl_key_lev.run_mode	= "run-normal"
 			break
 		end
-		is_ext_timeout = t_wait_key - obj_key_lev.key_time > OPT_DELAY_EXT
-		-- potentially every keys can be a state key, highest priority:
-		is_stt = key_str_new ~= "" or vkc_no_repeat and win_GetKeyState(vkc_no_repeat)
-		is_hld = key_str_new == "" and fnc_is_holding(obj_key_lev.key_rec)
-		is_dbl = not is_ext_timeout
-		--[[ double key need to be double pressed in the time frame lesser than OPT_DELAY_EXT,
-		to differentiate it from subsequent presses of the same key,
-		as for example to differentiate "CtrlF9:Double" and "CtrlF9-CtrlF9" ]]
-		local tbl_chk_all, tbl_chk_ext = fnc_get_ext_chk(obj_key_lev, tbl_key_seq, { DBL = is_dbl, HLD = is_hld, STT = is_stt })
-		if	#tbl_chk_all == 0
-		then	if	#tbl_key_seq == 1
-			then	tbl_key_lev.stop_cause	= "no-ext-one"
+		local	str_ext, tbl_ext, tbl_ext_allowed = fnc_get_ext_chk(obj_key_lev, key_str_new, t_wait_key)
+		-- prevent futile trying to determine sequences
+		if not	str_ext
+		and not	tbl_ext.NON
+		and not	tbl_ext.PRE
+		then
+			if	#tbl_key_lev == 1
+			then	-- just run normal
+				tbl_key_lev.stop_cause	= "no-ext-one"
 				tbl_key_lev.run_mode	= "run-normal"
-			else	tbl_key_lev.stop_cause	= "no-ext-seq"
+			else	-- lost sequence
+				tbl_key_lev.stop_cause	= "no-ext-seq"
 				tbl_key_lev.run_mode	= "ask-normal"
 			end
-			break -- run normal, is lost sequence
-		end
-		is_stt = is_stt and tbl_chk_ext.STT
-		-- holding is considered only after exceeding OPT_DELAY_EXT time frame
-		is_hld = is_hld and tbl_chk_ext.HLD and is_ext_timeout
-		is_dbl = is_dbl and tbl_chk_ext.DBL and key_str_new ~= ""
-			and (	fnc_key_equal(key_str_new, obj_key_lev.key_str_act)
-			or	fnc_key_equal(key_str_new, obj_key_lev.key_str_bas))
-		local 	str_ext = is_stt and "STT" or is_hld and "HLD" or is_dbl and "DBL" 
+			break
+		end --]]
 		if	str_ext
+		and not MULTI_KEY_EXT[str_ext]
 		then
-			key_str_bas = false
-			obj_key_lev.ext_type		= str_ext
-			obj_key_lev.key_str_bas_ext	= obj_key_lev.key_str_bas..tbl_ext_mode_disp[str_ext]
-			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..tbl_ext_mode_disp[str_ext]
+			key_str_bas = false 
+			obj_key_lev.key_str_bas_ext	= obj_key_lev.key_str_bas..	tbl_ext_mode_disp[str_ext]
+			obj_key_lev.key_str_seq 	= obj_key_lev.key_str_seq..	tbl_ext_mode_disp[str_ext]
+			obj_key_lev.key_str_seq_rgx	= obj_key_lev.key_str_seq_rgx..	tbl_ext_mode_disp[str_ext]
 			obj_key_lev.key_bas		= obj_key_lev.key_ext 
 			obj_key_lev.key_ext		= obj_key_lev.key_ext[str_ext]
-			obj_key_cur.ext			= str_ext 
-			obj_key_cur.key			= str_lower(obj_key_cur.key..tbl_ext_mode_disp[str_ext])
-			if is_stt
+			obj_key_lev.ext_type		= str_ext
+			if str_ext == "STT"
 			then key_stt_id, obj_key_stt, obj_hld_key = fnc_key_state_add(
 				key_str_new ~= "" and key_str_new or obj_key_lev.key_str_act, 
 				key_stt_id, 
@@ -1051,14 +1127,18 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					)
 			end
 		elseif
-			key_str_new ~= "" -- got the next key
+			MULTI_KEY_EXT[str_ext]
 		then
+			local	plain_tried, same_cas_tried, is_many,
+				key_obj_seq, key_str_seq, 
+				key_obj_try, key_exp_try, key_str_try, 
+				key_obj_new, key_exp_new
 			local	key_rec_new = fnc_NameToInputRecord(key_str_new) -- real
 			local	cas_mod_is_same =
 					-- for keys like Ctrl, CtrlAlt, etc. we do not need same CAS state
 					({next(obj_key_lev.key_exp)})[2].key == "" or
 					band(key_rec_new	.ControlKeyState, MOD_MASK) ==
-					band(obj_key_lev.key_rec.ControlKeyState, MOD_MASK)
+					band(obj_key_lev.key_rec.ControlKeyState, MOD_MASK)			
 			if not	cas_mod_is_same
 			and	BREAK_SEQ_ON_MOD_RELEASE
 			then	tbl_key_lev.cas_mod_expect = band(obj_key_lev.key_rec	.ControlKeyState, MOD_MASK)
@@ -1067,13 +1147,12 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 				tbl_key_lev.run_mode	= "ask-normal"
 				break
 			end
-			local	key_str_try = key_str_new
-			local	plain_tried, same_cas_tried
-			local	key_exp_new, key_obj_new = fnc_key_expand(key_str_new, true, true)
+			is_many = str_ext == "MNY"
+			key_str_try = key_str_new
+			key_exp_new, key_obj_new = fnc_key_expand(key_str_new, not is_many, true)
 			::seq_key_try::
-			local	key_rec_try = fnc_NameToInputRecord(key_str_try) -- real
-			local	key_exp_try, key_obj_try = fnc_key_expand(key_str_try, true, true)
-			local	key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, obj_key_lev.key_ext.SEQ)
+			key_exp_try, key_obj_try = fnc_key_expand(key_str_try, not is_many, true)
+			key_str_seq, key_obj_seq = fnc_key_equal( key_exp_try, is_many and obj_key_lev.key_exp or obj_key_lev.key_ext.SEQ)
 			if not	key_str_seq
 			and not plain_tried
 			--[[ --[=[TODO: to think about, probably we need flag "TRY PLAIN" here?
@@ -1081,7 +1160,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			and	cas_mod_is_same --]]
 			-- KXP.key as "plain" key cant be used here, since it is NEW key
 			and	key_obj_try.plain -- false in the kind of RCtrlAlt
-			and	str_lower(key_str_try) ~= str_lower(key_obj_try.plain)
+			and	key_str_try:lower() ~= key_obj_try.plain:lower()
 			then	key_str_try = key_obj_try.plain
 				plain_tried = true
 				goto seq_key_try
@@ -1091,72 +1170,117 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			-- same as above musing, should we invent flag for "TRY NEXT SEQ WITH THE SAME AS PREV CAS" ?
 			and	obj_key_lev.key_str_cas ~= ""		-- current key CAS need to be
 			and (	plain_tried				-- means plain already tried unsuccessfully
-			or	({next(key_exp_try)})[2].cas == "")	-- .. or is a plain key anyway
+			or	({next(key_exp_try)})[2].cas == "" )	-- .. or is a plain key anyway
 		--	and	({next(key_exp_new)})[2].cas == "" --[[ do it only if the original new key without CAS,
 			and (	band(key_rec_new.ControlKeyState, obj_key_lev.key_rec.ControlKeyState, MOD_MASK) > 0
 			-- says CAS keys can be released, but not with new CAS keys pressed:
 			and	band(key_rec_new	.ControlKeyState, MOD_MASK)
 			<	band(obj_key_lev.key_rec.ControlKeyState, MOD_MASK)
-			or	({next(key_exp_new)})[2].cas == "")
+			or	({next(key_exp_new)})[2].cas == "" )
 			then	-- try with the same CAS mods as the previous key:
 				key_str_try = fnc_key_prettify(obj_key_lev.key_str_cas_rec..key_str_try)
 				same_cas_tried = true
 				goto seq_key_try
 			end
-			if not	key_str_seq -- ? is it registered sequence key
-			then	tbl_key_lev.stop_cause	= "wrong-seq"
-				tbl_key_lev.run_mode	= "ask-normal"
-				break -- run normal
-			end
-			obj_key_lev.next_type = "SEQ"
-			obj_key_lev.next_key_str = key_str_try
-			obj_key_lev.next_key_lev = {
-				key_str_act =	key_str_new,
-				key_rec_act =	key_rec_new,
-				key_str_bas =	key_str_try,
-				key_str_cas =	({next(key_exp_try)})[2].cas,
-				key_str_cas_rec=({next(key_exp_try)})[2].rec_cas,
-				key_ext_pre =	obj_key_lev.key_ext,
-				key_ext =	key_obj_seq,
-				key_rec_pre =	obj_key_lev.key_rec,
-				key_rec =	key_rec_try,
-				key_str_seq =	obj_key_lev.key_str_seq.."-"..fnc_key_prettify(key_str_try):gsub("-", "Minus"):gsub("+", "Plus"),
-				key_exp =	key_exp_try,
-				key_time=	t_wait_key,
-			}
-			obj_key_lev = obj_key_lev.next_key_lev
-			tbl_key_lev[#tbl_key_lev + 1] = obj_key_lev
-			str_ext		= "SEQ"
-			key_str_bas	= obj_key_lev.key_str_bas 
-			vkc_no_repeat	= obj_key_lev.key_rec_act.VirtualKeyCode -- prevent autorepeat
-			obj_key_cur = {
-				exp = obj_key_lev.key_exp,
-				bas = obj_key_lev.key_str_bas,
-				key = obj_key_lev.key_str_bas,
-			}
-			tbl_key_seq[#tbl_key_seq + 1] = obj_key_cur
-		else -- no SEQ/HLD/DBL/STT
-			if	OPT_DELAY_HLP < t_wait_key - obj_key_lev.key_time
-			then	far_Message(obj_key_lev.hlp_str, obj_key_lev.key_str_seq.."-... ?", "", "l")
+			::end_of_seq_determine::
+			if	key_str_seq -- ? registered sequence or regexp(=MNY) key
+			then
+				str_ext		= is_many and "MNY" or "SEQ"
+				key_str_bas	= key_str_try 
+				vkc_no_repeat	= key_rec_new.VirtualKeyCode -- prevent autorepeat
+				if not	obj_key_lev.ext_type
+				and	str_ext == "MNY"
+				then	obj_key_lev.ext_type = "MNY"
+					obj_key_lev.key_str_seq_rgx = obj_key_lev.key_str_seq_rgx..":Many"
+				end				
+				local 	regex_many_cnt = is_many and ((obj_key_lev.key_reg_exp_cnt or 0) + 1) or nil
+				local 	regex_many_str = is_many and ({next(obj_key_lev.key_exp)})[1] or nil
+				local 	regex_many_obj = is_many and ({next(obj_key_lev.key_exp)})[2] or nil
+				if	regex_many_obj
+				then	regex_many_obj = regex_many_obj.reobj
+				end
+				local key_str_try_disp = regex_many_obj and key_str_try or fnc_key_prettify(key_str_try):gsub("-", "Minus"):gsub("+", "Plus")
+				local key_str_seq_rgx = not is_many 
+					and	obj_key_lev.key_str_seq_rgx.."-"..key_str_try_disp
+					or	regex_many_cnt == 1 and obj_key_lev.key_reg_exp_str ~= regex_many_str
+					and	obj_key_lev.key_str_seq_rgx.."-"..regex_many_str
+					or	regex_many_cnt == 1 and obj_key_lev.key_reg_exp_str == regex_many_str
+					and	obj_key_lev.key_str_seq_rgx
+					or	regex_many_cnt > 1
+					and	obj_key_lev.key_str_seq_rgx
+					or	"?????????????????"
+				obj_key_lev.next_type = str_ext
+				obj_key_lev.next_key_str = key_str_try
+				obj_key_lev.next_key_lev = {
+					ext_type	= str_ext,
+					key_str_act	= key_str_new,
+					key_rec_act	= key_rec_new,
+					key_str_bas	= key_str_bas,
+					key_str_cas	= ({next(key_exp_try)})[2].cas,
+					key_str_cas_rec	= ({next(key_exp_try)})[2].rec_cas,
+					key_ext_pre	= obj_key_lev.key_ext,
+					ext_type	= is_many and "MNY" or nil, -- SEQ/MNY
+					key_exp		= is_many and obj_key_lev.key_exp or key_exp_try,
+					key_ext		= is_many and obj_key_lev.key_ext or key_obj_seq,
+					key_str_seq	= obj_key_lev.key_str_seq.."-"..key_str_try_disp,
+					key_str_seq_rgx = key_str_seq_rgx,
+					key_rec_pre	= obj_key_lev.key_rec,
+					key_rec		= fnc_NameToInputRecord(key_str_try),
+					key_time	= t_wait_key,
+					key_reg_exp_cnt	= regex_many_cnt,
+					key_reg_exp_obj	= regex_many_obj,
+					key_reg_exp_str	= regex_many_str,
+					prev_key_lev	= obj_key_lev,
+				}
+				obj_key_lev = obj_key_lev.next_key_lev
+				tbl_key_lev[#tbl_key_lev + 1] = obj_key_lev
+			else
+				if	is_many
+				and	tbl_ext.SEQ
+				then
+					is_many = false
+					plain_tried = false
+					same_cas_tried = false
+					obj_key_lev.key_ext = obj_key_lev.key_ext.MNY
+					goto seq_key_try
+				else
+					if	#tbl_key_lev == 1
+					then -- run normal if single
+						tbl_key_lev.stop_cause	= "no-ext-one"
+						tbl_key_lev.run_mode	= "run-normal"
+					else -- the sequence went wrong, ask what to do
+						tbl_key_lev.stop_cause	= "wrong-seq"
+						tbl_key_lev.run_mode	= "ask-normal"
+					end
+					break
+				end			
 			end
 		end
 		if	str_ext
+		and	str_ext ~= "NON"
 		then -- some keyboard event happened
-			t_last_key = t_wait_key 
-			obj_key_lev.mcr_all, obj_key_lev.mcr_fin = fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_seq, false)
-			if #obj_key_lev.mcr_fin > 0
-			then    tbl_key_lev.stop_cause	= "ext-seq-exists"
+			obj_key_lev.mcr_all,
+			obj_key_lev.mcr_fin,
+			obj_key_lev.mcr_key_cur,
+			obj_key_lev.hlp_str
+				= fnc_get_fin_scp(obj_key_lev.key_ext.SCP, obj_handler.prio_cond, tbl_key_lev, false)
+			if #obj_key_lev.mcr_fin > 0 
+			and obj_key_lev.ext_type ~= "MNY" -- meanwhile we want to chain MANY as long as it satisfies criteria
+			then	tbl_key_lev.stop_cause	= "ext-seq-exists"
 				tbl_key_lev.run_mode	= "ext-seq-run"
 				break
 			else	obj_status:set(obj_key_lev.key_str_seq.."-... ?", nil, 10000000)
-				obj_key_lev.hlp_str = fnc_get_seq_hlp(obj_key_lev, tbl_key_seq)
 			end
+		elseif -- nothing happened (no SEQ/MNY/HLD/DBL/STT) so probably we should show help message
+			(t_wait_key - obj_key_lev.key_time) > OPT_DELAY_HLP
+		then	
+			far_Message(obj_key_lev.hlp_str, obj_key_lev.key_str_seq.."-... ?", "", "l")
 		end
-		is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
+		local	is_cas_mod_rls, cas_int_new = fnc_is_cas_mod_rls(obj_key_lev.key_rec_act)
 		if	is_cas_mod_rls 
 		and	BREAK_SEQ_ON_MOD_RELEASE -- CAS changed when should not
 		and (	obj_key_lev.key_bas -- need to be a plain key to break on wrong CasModChg
-		or	obj_key_lev.key_ext).KXP.key ~= ""
+		or	obj_key_lev.key_ext ).KXP.key ~= ""
 		then	tbl_key_lev.is_cas_mod_rls = is_cas_mod_rls
 			tbl_key_lev.cas_mod_int_rls = cas_int_new
 			tbl_key_lev.stop_cause	= "cas-mod-rls"
@@ -1164,6 +1288,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			break
 		end
 	until false
+	vkc_no_repeat = false
 	tbl_key_lev.stop_time = Far.UpTime
 	far.RestoreScreen(obj_scr)
 	if	tbl_key_lev.run_mode == "ask-normal"
@@ -1178,7 +1303,7 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 		else
 			bad_key_seq = str_format("%s + %s", obj_key_lev.key_str_seq,
 				key_str_new ~= "" and key_str_new
-				or is_cas_mod_rls and str_format("[cas-mod-chg:] %s  ==>> %s",
+				or tbl_key_lev.is_cas_mod_rls and str_format("[cas-mod-chg:] %s  ==>> %s",
 					fnc_cas_int_to_str(obj_key_lev.key_rec.ControlKeyState, "<none>"), 
 					fnc_cas_int_to_str(cas_int_new, "<none>"))
 				or "???")
@@ -1214,7 +1339,9 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 					tbl_key_lev.run_mode == "ask-normal" and " anassigned," or "",
 					res_msg == 2 and " (saved)" or ""
 				),
-				nil, 2500)
+				nil, 
+				2500
+			)
 			flg_ext_mod_off = true
 			for ii = 1, #obj_waitkeys.keys
 			do runMacroOrKey(obj_waitkeys.keys[ii])
@@ -1239,22 +1366,20 @@ local function fnc_hnd_mcr_action(obj_handler, mcr_src)
 			obj_key_stt.tick_state_repeat	= scr_obj.obj_macro.data.tick_state_repeat
 			obj_key_stt.key_run_normal_if_state_was_not_used
 							= scr_obj.obj_macro.data.key_run_normal_if_state_was_not_used
-			obj_key_stt.obj_script		= scr_obj -- needed?
 			if	scr_obj.obj_macro.data.key_states
 			then	scr_obj.obj_macro.data.key_states[key_stt_id] = obj_key_stt
 			else	scr_obj.obj_macro.data.key_states = { [key_stt_id] = obj_key_stt }
 			end
 		end
 		tbl_key_lev.exec_time = Far.UpTime
-		tbl_key_lev.eval_ok, 
-		tbl_key_lev.eval_res 
-			= runMacro(obj_key_lev.key_str_seq)
-		if not	tbl_key_lev.eval_ok
-		and	tbl_key_lev.eval_res == -2
-		then 	tbl_key_lev.eval_res = eval(({ next(scr_obj.keys_full) })[1], 2)
-			tbl_key_lev.eval_ok = tbl_key_lev.eval_res ~= EVAL_MACRONOTFOUND
+		tbl_key_lev.eval_res = eval(obj_key_lev.key_str_seq_rgx, 2)
+		if	tbl_key_lev.eval_res== EVAL_MACRONOTFOUND
+		then	tbl_key_lev.eval_res = EVAL_MACRONOTFOUND_X
+			local obj_macro = obj_key_lev.mcr_fin[1].obj_macro
+			obj_macro.action(obj_macro.data, --[[!reserved:]]nil, --[[!reserved:]]nil, tbl_key_lev, obj_waitkeys.keys)
+			tbl_key_lev.eval_res = EVAL_SUCCESS_X
 		end
-		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq, tbl_key_lev.eval_res, EVAL_RES[tbl_key_lev.eval_res]), nil, 3000)
+		obj_status:set(str_format("%s Res %s/%s", obj_key_lev.key_str_seq_rgx, tbl_key_lev.eval_res, EVAL_RES[tbl_key_lev.eval_res]), nil, 3000)
 	elseif
 		tbl_key_lev.run_mode == "run-cancel"
 	then
@@ -1326,65 +1451,101 @@ local function fnc_macro_ex_create(tbl_handlers)
 	end end
 end -- fnc_macro_ex_create
 
-local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
-	local tbl_handlers_loc = { }
-	local mcr_id_ext = str_upper(win_uuid(win_uuid()))
-	for ii, ii_key in pairs(fnc_str_split(str_lower(obj_mcr.key), "%s", true))
-	do	local ii_has_ext
-		local tbl_key_ii = { }
-		local tbl_ext_ii = { }
-		local tbl_ext_jj = tbl_ext_ii
-		for jj_key_seq, jj_key_sep in str_gmatch(ii_key, "([^-+]*)([-+]?)") 
-		do
-			if	jj_key_seq == ""
-			then	if	#tbl_key_ii == 0
-				then	--[[ this phenomena happened to me on "-",
-					this is plain key, so just skip it]]
-					break -- ii_has_ext remains nil here
-				else	--[[ this phenomena happens onto such plain keys,
+local fnc_split_key do
+local EXPR_KEY_SEP_PLAIN = "([^-+]*)([-+]?)"
+local EXPR_KEY_SEP_REGEX = "(/.+/:?%w*)([-+]?)"
+local function fnc_split_key_simple(ii_key, to_be_continued, is_rgx, tbl_key_ii, ii_has_ext)
+	for jj_key_seq, jj_key_sep in str_gmatch(ii_key, is_rgx and EXPR_KEY_SEP_REGEX or EXPR_KEY_SEP_PLAIN) 
+	do	if jj_key_seq == ""
+		then	if	#tbl_key_ii == 0
+			then	--[[ this phenomena happened to me on "-",
+				this is plain key, so just skip it]]
+				break -- ii_has_ext remains nil here
+			else	if not	to_be_continued
+				then	--[[ this phenomena happens onto such plain keys,
 					as "Alt-" for example, should be on finalizing key ]]
 					tbl_key_ii[#tbl_key_ii].key = tbl_key_ii[#tbl_key_ii].key..tbl_key_ii[#tbl_key_ii].sep
 					tbl_key_ii[#tbl_key_ii].sep = jj_key_sep
-					goto seq_keys_loop_end
 				end
+				goto seq_keys_loop_end
 			end
-			-- try to save load time:
-			if not	ii_has_ext
-			and (	#tbl_key_ii > 0
-			or	str_find( jj_key_seq, "%S[:]%S"))
-			then	ii_has_ext = true
-			end
-			tbl_key_ii[#tbl_key_ii + 1] = { key = jj_key_seq, sep = jj_key_sep }
-			::seq_keys_loop_end::
 		end
+		-- try to save load time:
+		if not	ii_has_ext
+		and (	#tbl_key_ii > 0
+		or	str_find(jj_key_seq, "%S[:]%S") )
+		then	ii_has_ext = true
+		end
+		tbl_key_ii[#tbl_key_ii + 1] = { key = is_rgx and jj_key_seq or str_lower(jj_key_seq), sep = jj_key_sep, rgx = is_rgx }
+		::seq_keys_loop_end::
+	end
+	return ii_has_ext
+end -- fnc_split_key_simple
+
+fnc_split_key = function(ii_key, tbl_key_ii, ii_has_ext)
+	local	first_simple, first_slash 
+	if	str_match(ii_key, "^/.+/")
+	then	first_simple, first_slash = "", ii_key
+	else	first_simple, first_slash = str_gmatch(ii_key, "([^/]+)(/.-/.+)")()
+	end
+	if not  first_simple
+	then	ii_has_ext = fnc_split_key_simple(ii_key, false, nil, tbl_key_ii, ii_has_ext)
+	else	if	first_simple ~= ""
+		then	ii_has_ext = fnc_split_key_simple(first_simple		, true, nil, tbl_key_ii, ii_has_ext)
+		end
+		for	jj_key_rgx_seq_sep, jj_key_plain_sep in str_gmatch(first_slash, "(/.-/:?%w*[-+]?)([^/]*)")
+		do	ii_has_ext = fnc_split_key_simple(jj_key_rgx_seq_sep	, true, true,tbl_key_ii, ii_has_ext)
+			ii_has_ext = fnc_split_key_simple(jj_key_plain_sep	, true, nil, tbl_key_ii, ii_has_ext)
+		end
+	end
+	return ii_has_ext
+end
+
+end -- scope for fnc_split_key
+
+local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
+	local tbl_handlers_loc = { }
+	local mcr_id_ext = str_upper(win_uuid(win_uuid()))
+	for ii, ii_key in pairs(fnc_str_split(obj_mcr.key, "%s", true))
+	do	local ii_key_low = ii_key 
+		local tbl_key_ii = { }
+		local tbl_ext_ii = { }
+		local tbl_ext_jj = tbl_ext_ii
+		local	ii_has_ext = fnc_split_key(ii_key, tbl_key_ii, ii_has_ext)
 		if not	ii_has_ext
 		then	goto enum_full_keys_loop_end
 		end
-		local tbl_scr_key_ii = { [ii_key] = {
-			key_full = ii_key,
+		local tbl_scr_key_ii = { [ii_key_low] = {
+			key_full = ii_key_low,
 			key_path = tbl_key_ii,
 			scripts = { [mcr_id_ext] = obj_mcr }
 		} }
-		for	jj, jj_key_seq in pairs(tbl_key_ii)
-		do	jj_key_seq.key = jj_key_seq.key:gsub("minus", "-"):gsub("plus", "+") -- normalize orig key string
-			local tbl_seq_stub_jj = { }
+		for jj, jj_key_seq in pairs(tbl_key_ii)
+		do	local tbl_seq_stub_jj = { }
 			local tbl_ext_stub_jj
 			local	jj_key_base, jj_ext_mode = str_match(jj_key_seq.key, "^(.+):(.+)$")
+			if not	jj_key_base
+			then	jj_key_base = jj_key_seq.key
+			end
+			if	jj_key_seq.rgx
+			then	jj_key_seq.rgx = regex.new(jj_key_base)
+			else	jj_key_base = jj_key_base:lower():gsub("minus", "-"):gsub("plus", "+") -- normalize orig key string
+			end
+			jj_key_seq.bas = jj_key_base
 			if	jj_ext_mode
-			then	-- here ext_mode supposed to be HLD, DBL, STT
+			then	-- here ext_mode supposed to be HLD, DBL, STT, MNY
+				jj_ext_mode = str_lower(jj_ext_mode)
 				local	jj_ext_code = tbl_ext_mode_code[jj_ext_mode]
 				if	jj_ext_code
 				then	jj_key_seq.ext = jj_ext_code
-					jj_key_seq.bas = jj_key_base
 					tbl_ext_stub_jj = { EXT = jj_ext_code, SCP = tbl_scr_key_ii, SEQ = ALLOW_SEQ_IN_EXT and tbl_seq_stub_jj }
 				else	if opts.DbgShowBadExt
 					then fnc_err_msg(str_format("wrong extension %s in sequence %s", jj_ext_mode, ii_key))
 					end
 					goto enum_full_keys_loop_end -- cancel sequences with an unacceptable extension
 				end
-			else	jj_key_seq.bas = jj_key_seq.key
 			end
-			jj_key_seq.exp = fnc_key_expand(jj_key_seq.bas, true, false) -- unified complex key in lower case
+			jj_key_seq.exp = fnc_key_expand(jj_key_seq.bas, true, false, jj_key_seq.rgx) -- unified complex key in lower case
 			for kk_str, kk_val in pairs(jj_key_seq.exp)
 			do 	tbl_ext_jj[kk_str] = { EXT = jj_key_seq.ext and true, KXP = kk_val, SCP = tbl_scr_key_ii }
 				if	jj_key_seq.ext
@@ -1394,9 +1555,9 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			end
 			tbl_ext_jj = jj_key_seq.ext and ALLOW_SEQ_IN_EXT and tbl_ext_stub_jj.SEQ or tbl_seq_stub_jj
 		end -- end of the sequence keys processing loop
-		if not	tbl_ext_seq_key_reg[ii_key]
-		then	tbl_ext_seq_key_reg[ii_key] = { key_path = tbl_key_ii, scripts = { [mcr_id_ext] = obj_mcr } }
-		else	tbl_ext_seq_key_reg[ii_key].scripts[mcr_id_ext] = obj_mcr
+		if not	tbl_ext_seq_key_reg[ii_key_low]
+		then	tbl_ext_seq_key_reg[ii_key_low] = { key_path = tbl_key_ii, scripts = { [mcr_id_ext] = obj_mcr } }
+		else	tbl_ext_seq_key_reg[ii_key_low].scripts[mcr_id_ext] = obj_mcr
 		end
 		if	obj_mcr.data.id_ext ~= mcr_id_ext
 		then	
@@ -1409,7 +1570,7 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 			obj_mcr.data.areas_work = obj_mcr.data.areas_dict.common and { "common" } or obj_mcr.data.areas_arr
 			obj_mcr.data.key_seq_all = { }
 		end
-		obj_mcr.data.key_seq_all[ii_key] = tbl_key_ii -- should be only once
+		obj_mcr.data.key_seq_all[ii_key_low] = tbl_key_ii -- should be only once
 		for mm_ext_key, mm_ext_obj in pairs(tbl_ext_ii)
 		do	local areas_work =
 				tbl_macro_ex_handlers.common and tbl_macro_ex_handlers.common[mm_ext_key] and { "common" }
@@ -1429,9 +1590,19 @@ local function fnc_macro_ex_check_one(obj_mcr, create_handlers)
 	return tbl_handlers_loc
 end -- fnc_macro_ex_check_one
 
+local tbl_mcr_exc_run = { }
+local tbl_mcr_exc_ask = { }
+Xer0X.mcr_scr_excepts = tbl_mcr_exc_run
+Xer0X.mcr_scr_exc_dlg = tbl_mcr_exc_ask
+local FMT_FNC_ID = "%s:%s-%s"
+local FUNC_META_INFO = "Sl"
+
 local function fnc_make_wrap(fnc_orig, str_mark, str_dscr, str_file)
+	local tbl_dbginf = dbg_getinf(fnc_orig, FUNC_META_INFO)
+	local id_func = str_fmt_s(FMT_FNC_ID, tbl_dbginf.source, tbl_dbginf.linedefined, tbl_dbginf.lastlinedefined)
+
 	return function(...)
-		local p1, p2, p3 = ...
+		local p1, p2, p3, p4, p5 = ...
 		local p1_type = type(p1)
 		local p2_type = type(p2)
 		local inp_val =
@@ -1440,8 +1611,22 @@ local function fnc_make_wrap(fnc_orig, str_mark, str_dscr, str_file)
 			p1_type ~= "nil" and p1_type or
 			p2_type ~= "nil" and p2_type or
 			p1_type
-		local ret_val = fnc_orig(...)
-		return ret_val
+		local	is_exc = tbl_mcr_exc_run[id_func]
+		local	is_ask = tbl_mcr_exc_ask[id_func]
+		if	is_exc
+		and	is_ask
+		then	-- in ask dialog, do not run
+		elseif	is_exc
+		and not is_ask
+		then	-- here we should ask what to do
+			tbl_mcr_exc_ask[id_func] = true
+			tbl_mcr_exc_ask[id_func] = false
+		else 
+			tbl_mcr_exc_run[id_func] = true
+			local tbl_ret_val = { fnc_orig(...) }
+			tbl_mcr_exc_run[id_func] = false
+			return unpack(tbl_ret_val)
+		end
 	end
 end
 
@@ -1454,27 +1639,24 @@ local function fnc_macro_ex_build_all()
 		and	str_find(ii_mcr.key, "%S[:%-%+]%S") -- %S(s) - any (non-)whitespace character
 		then	fnc_macro_ex_check_one(ii_mcr)
 		end
-		if	Xer0X.MCR_DBG_WRAP
+		local	ii_mcr_dat = ii_mcr.data and ii_mcr.data or ii_mcr
+		if (	Xer0X.DBG_WRAP_MACRO and ii_mcr_dat.area
+		or	Xer0X.DBG_WRAP_EVENT and ii_mcr_dat.group )
 		and	ii_mcr.FileName ~= FileName
-		and not(ii_mcr.data and ii_mcr.data or ii_mcr).DBG_WRAP
+		and not	ii_mcr_dat.DBG_WRAP
 		then
-			local	mcr_file = ii_mcr.FileName and Xer0X.fnc_str_extract_file_name(ii_mcr.FileName) or "<UNKNOWN>"
-			local	mcr_dscr = ii_mcr.description or "<NO-DESCR>"
-			local	mcr_cond = ii_mcr.condition
-			local	mcr_acts = ii_mcr.action
-			if type(mcr_cond) == "function"
-			then ii_mcr.condition	= fnc_make_wrap(mcr_cond, "COND.", mcr_dscr, mcr_file)
-			end
-			if type(mcr_acts) == "function"
-			then ii_mcr.action	= fnc_make_wrap(mcr_acts, "ACTS.", mcr_dscr, mcr_file)
-			end
-			(ii_mcr.data and ii_mcr.data or ii_mcr).DBG_WRAP = true
+			local mcr_file = ii_mcr.FileName and fnc_extr_file_name(ii_mcr.FileName) or "<UNKNOWN>"
+			local mcr_dscr = ii_mcr.description or "<NO-DESCR>"
+			local mcr_cond = ii_mcr.condition
+			local mcr_acts = ii_mcr.action
+			if type(mcr_cond) == "function" then ii_mcr.condition	= fnc_make_wrap(mcr_cond, "COND.", mcr_dscr or "?", mcr_file) end
+			if type(mcr_acts) == "function" then ii_mcr.action	= fnc_make_wrap(mcr_acts, "ACTS.", mcr_dscr or "?", mcr_file) end
+			ii_mcr_dat.DBG_WRAP = true
 		end
 	end
 	fnc_macro_ex_create(tbl_macro_ex_handlers)
 	if opts.DbgShowLoadTime
-	then 	le(opts)
-		far_Message(Far.UpTime - t1, "extended keys load time")
+	then far_Message(Far.UpTime - t1, "extended keys load time")
 	end
 	if not	Xer0X.fnc_macro_ex_build_all
 	then	Xer0X.fnc_macro_ex_build_all = fnc_macro_ex_build_all
@@ -1483,7 +1665,8 @@ local function fnc_macro_ex_build_all()
 end -- fnc_macro_ex_build_all
 
 Macro {	description = "Save all keys for the further analysis",
-	area = "Common", key = "/.+/", 
+	area = "Common", 
+	key = "/.+/", 
 	condition = function(inp_key)
 		if Area.Menu and Menu.Id == "7646F761-8954-42CA-9CFC-E3F98A1C54D3"
 		or not inp_key
